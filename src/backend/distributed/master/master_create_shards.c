@@ -381,6 +381,9 @@ CreateReferenceTableShard(Oid distributedTableId)
 							   tableName)));
 	}
 
+	/* don't allow concurrent node list changes that require an exclusive lock */
+	LockRelationOid(DistNodeRelationId(), RowShareLock);
+
 	/* load and sort the worker node list for deterministic placement */
 	workerNodeList = ActiveWorkerNodeList();
 	workerNodeList = SortList(workerNodeList, CompareWorkerNodes);
