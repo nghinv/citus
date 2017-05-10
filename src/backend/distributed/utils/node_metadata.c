@@ -35,6 +35,7 @@
 #include "distributed/worker_transaction.h"
 #include "lib/stringinfo.h"
 #include "storage/bufmgr.h"
+#include "storage/lmgr.h"
 #include "storage/lock.h"
 #include "storage/fd.h"
 #include "utils/builtins.h"
@@ -188,6 +189,9 @@ master_disable_node(PG_FUNCTION_ARGS)
 
 	CheckCitusVersion(ERROR);
 
+	/* take an exclusive lock on pg_dist_node to serialize pg_dist_node changes */
+	LockRelationOid(DistNodeRelationId(), ExclusiveLock);
+
 	DeleteAllReferenceTablePlacementsFromNode(nodeName, nodePort);
 
 	hasActiveShardPlacements = NodeHasShardPlacements(nodeName, nodePort,
@@ -281,22 +285,12 @@ NodeForGroup(uint32 groupId)
 static Datum
 ActivateNode(char *nodeName, int nodePort)
 {
-	Relation pgDistNode = heap_open(DistNodeRelationId(), AccessShareLock);
-	HeapTuple heapTuple = GetNodeTuple(nodeName, nodePort);
-	CommandId commandId = GetCurrentCommandId(true);
-	LockTupleMode lockTupleMode = LockTupleExclusive;
-	LockWaitPolicy lockWaitPolicy = LockWaitError;
-	bool followUpdates = false;
-	Buffer buffer = 0;
-	HeapUpdateFailureData heapUpdateFailureData;
-
 	WorkerNode *workerNode = NULL;
 	bool isActive = true;
 	Datum nodeRecord = 0;
 
-	heap_lock_tuple(pgDistNode, heapTuple, commandId, lockTupleMode, lockWaitPolicy,
-					followUpdates, &buffer, &heapUpdateFailureData);
-	ReleaseBuffer(buffer);
+	/* take an exclusive lock on pg_dist_node to serialize pg_dist_node changes */
+	LockRelationOid(DistNodeRelationId(), ExclusiveLock);
 
 	SetNodeState(nodeName, nodePort, isActive);
 
@@ -304,8 +298,6 @@ ActivateNode(char *nodeName, int nodePort)
 
 	workerNode = FindWorkerNode(nodeName, nodePort);
 	nodeRecord = GenerateNodeTuple(workerNode);
-
-	heap_close(pgDistNode, AccessShareLock);
 
 	return nodeRecord;
 }
@@ -320,12 +312,20 @@ Datum
 master_initialize_node_metadata(PG_FUNCTION_ARGS)
 {
 	ListCell *workerNodeCell = NULL;
-	List *workerNodes = NULL;
+	List *workerNodes = NIL;
 	bool nodeAlreadyExists = false;
 
 	CheckCitusVersion(ERROR);
 
+	/*
+	 * This function should only ever be called from the create extension
+	 * script, but just to be sure, take an exclusive lock on pg_dist_node
+	 * to prevent concurrent calls.
+	 */
+	LockRelationOid(DistNodeRelationId(), ExclusiveLock);
+
 	workerNodes = ParseWorkerNodeFileAndRename();
+
 	foreach(workerNodeCell, workerNodes)
 	{
 		WorkerNode *workerNode = (WorkerNode *) lfirst(workerNodeCell);
@@ -517,6 +517,9 @@ RemoveNodeFromCluster(char *nodeName, int32 nodePort)
 	EnsureCoordinator();
 	EnsureSuperUser();
 
+	/* take an exclusive lock on pg_dist_node to serialize pg_dist_node changes */
+	LockRelationOid(DistNodeRelationId(), ExclusiveLock);
+
 	workerNode = FindWorkerNode(nodeName, nodePort);
 
 	if (workerNode != NULL)
@@ -574,7 +577,6 @@ static Datum
 AddNodeMetadata(char *nodeName, int32 nodePort, int32 groupId, char *nodeRack,
 				bool hasMetadata, bool isActive, bool *nodeAlreadyExists)
 {
-	Relation pgDistNode = NULL;
 	int nextNodeIdInt = 0;
 	Datum returnData = 0;
 	WorkerNode *workerNode = NULL;
@@ -587,8 +589,12 @@ AddNodeMetadata(char *nodeName, int32 nodePort, int32 groupId, char *nodeRack,
 
 	*nodeAlreadyExists = false;
 
-	/* acquire a lock so that no one can do this concurrently */
-	pgDistNode = heap_open(DistNodeRelationId(), AccessExclusiveLock);
+	/*
+	 * Take an exclusive lock on pg_dist_node to serialize node changes.
+	 * We may want to relax or have more fine-grained locking in the future
+	 * to allow users to add multiple nodes concurrently.
+	 */
+	LockRelationOid(DistNodeRelationId(), ExclusiveLock);
 
 	/* check if the node already exists in the cluster */
 	workerNode = FindWorkerNode(nodeName, nodePort);
@@ -596,9 +602,6 @@ AddNodeMetadata(char *nodeName, int32 nodePort, int32 groupId, char *nodeRack,
 	{
 		/* fill return data and return */
 		returnData = GenerateNodeTuple(workerNode);
-
-		/* close the heap */
-		heap_close(pgDistNode, AccessExclusiveLock);
 
 		*nodeAlreadyExists = true;
 
@@ -637,8 +640,6 @@ AddNodeMetadata(char *nodeName, int32 nodePort, int32 groupId, char *nodeRack,
 	nodeInsertCommand = NodeListInsertCommand(workerNodeList);
 	SendCommandToWorkers(WORKERS_WITH_METADATA, nodeInsertCommand);
 
-	heap_close(pgDistNode, AccessExclusiveLock);
-
 	/* fetch the worker node, and generate the output */
 	workerNode = FindWorkerNode(nodeName, nodePort);
 	returnData = GenerateNodeTuple(workerNode);
@@ -654,7 +655,7 @@ AddNodeMetadata(char *nodeName, int32 nodePort, int32 groupId, char *nodeRack,
 static void
 SetNodeState(char *nodeName, int32 nodePort, bool isActive)
 {
-	Relation pgDistNode = heap_open(DistNodeRelationId(), AccessShareLock);
+	Relation pgDistNode = heap_open(DistNodeRelationId(), RowExclusiveLock);
 	TupleDesc tupleDescriptor = RelationGetDescr(pgDistNode);
 	HeapTuple heapTuple = GetNodeTuple(nodeName, nodePort);
 
@@ -677,7 +678,7 @@ SetNodeState(char *nodeName, int32 nodePort, bool isActive)
 	CitusInvalidateRelcacheByRelid(DistNodeRelationId());
 	CommandCounterIncrement();
 
-	heap_close(pgDistNode, AccessShareLock);
+	heap_close(pgDistNode, NoLock);
 
 	/* we also update isactive column at worker nodes */
 	workerNode = FindWorkerNode(nodeName, nodePort);
@@ -720,7 +721,7 @@ GetNodeTuple(char *nodeName, int32 nodePort)
 	nodeTuple = heap_copytuple(heapTuple);
 
 	systable_endscan(scanDescriptor);
-	heap_close(pgDistNode, AccessShareLock);
+	heap_close(pgDistNode, NoLock);
 
 	return nodeTuple;
 }
@@ -752,7 +753,6 @@ GenerateNodeTuple(WorkerNode *workerNode)
 	values[Anum_pg_dist_node_hasmetadata - 1] = BoolGetDatum(workerNode->hasMetadata);
 	values[Anum_pg_dist_node_isactive - 1] = BoolGetDatum(workerNode->isActive);
 
-	/* open shard relation and insert new tuple */
 	pgDistNode = heap_open(DistNodeRelationId(), AccessShareLock);
 
 	/* generate the tuple */
@@ -760,8 +760,7 @@ GenerateNodeTuple(WorkerNode *workerNode)
 	heapTuple = heap_form_tuple(tupleDescriptor, values, isNulls);
 	nodeDatum = HeapTupleGetDatum(heapTuple);
 
-	/* close the relation */
-	heap_close(pgDistNode, AccessShareLock);
+	heap_close(pgDistNode, NoLock);
 
 	return nodeDatum;
 }
@@ -908,21 +907,20 @@ InsertNodeRow(int nodeid, char *nodeName, int32 nodePort, uint32 groupId, char *
 	values[Anum_pg_dist_node_hasmetadata - 1] = BoolGetDatum(hasMetadata);
 	values[Anum_pg_dist_node_isactive - 1] = BoolGetDatum(isActive);
 
-	/* open shard relation and insert new tuple */
-	pgDistNode = heap_open(DistNodeRelationId(), AccessExclusiveLock);
+	pgDistNode = heap_open(DistNodeRelationId(), RowExclusiveLock);
 
 	tupleDescriptor = RelationGetDescr(pgDistNode);
 	heapTuple = heap_form_tuple(tupleDescriptor, values, isNulls);
 
 	CatalogTupleInsert(pgDistNode, heapTuple);
 
-	/* close relation and invalidate previous cache entry */
-	heap_close(pgDistNode, AccessExclusiveLock);
-
 	CitusInvalidateRelcacheByRelid(DistNodeRelationId());
 
 	/* increment the counter so that next command can see the row */
 	CommandCounterIncrement();
+
+	/* close relation */
+	heap_close(pgDistNode, NoLock);
 }
 
 
@@ -939,7 +937,7 @@ DeleteNodeRow(char *nodeName, int32 nodePort)
 	SysScanDesc heapScan = NULL;
 	ScanKeyData scanKey[scanKeyCount];
 
-	Relation pgDistNode = heap_open(DistNodeRelationId(), AccessExclusiveLock);
+	Relation pgDistNode = heap_open(DistNodeRelationId(), RowExclusiveLock);
 
 	ScanKeyInit(&scanKey[0], Anum_pg_dist_node_nodename,
 				BTEqualStrategyNumber, F_TEXTEQ, CStringGetTextDatum(nodeName));
@@ -960,13 +958,14 @@ DeleteNodeRow(char *nodeName, int32 nodePort)
 	simple_heap_delete(pgDistNode, &(heapTuple->t_self));
 
 	systable_endscan(heapScan);
-	heap_close(pgDistNode, AccessExclusiveLock);
 
 	/* ensure future commands don't use the node we just removed */
 	CitusInvalidateRelcacheByRelid(DistNodeRelationId());
 
 	/* increment the counter so that next command won't see the row */
 	CommandCounterIncrement();
+
+	heap_close(pgDistNode, NoLock);
 }
 
 
