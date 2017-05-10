@@ -226,10 +226,13 @@ ReplicateSingleShardTableToAllWorkers(Oid relationId)
 static void
 ReplicateShardToAllWorkers(ShardInterval *shardInterval)
 {
-	/* we do not use pgDistNode, we only obtain a lock on it to prevent modifications */
-	Relation pgDistNode = heap_open(DistNodeRelationId(), AccessShareLock);
-	List *workerNodeList = ActiveWorkerNodeList();
+	List *workerNodeList = NIL;
 	ListCell *workerNodeCell = NULL;
+
+	/* prevent concurrent pg_dist_node changes */
+	LockRelationOid(DistNodeRelationId(), RowShareLock);
+
+	workerNodeList = ActiveWorkerNodeList();
 
 	/*
 	 * We will iterate over all worker nodes and if healthy placement is not exist at
@@ -245,8 +248,6 @@ ReplicateShardToAllWorkers(ShardInterval *shardInterval)
 
 		ReplicateShardToNode(shardInterval, nodeName, nodePort);
 	}
-
-	heap_close(pgDistNode, NoLock);
 }
 
 
