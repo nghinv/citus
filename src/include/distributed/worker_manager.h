@@ -43,6 +43,7 @@ typedef struct WorkerNode
 	char workerRack[WORKER_LENGTH];     /* node's network location */
 	bool hasMetadata;                   /* node gets metadata changes */
 	bool isActive;                      /* node's state */
+	Oid nodeRole;                       /* the node's role in its group */
 } WorkerNode;
 
 

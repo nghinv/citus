@@ -18,6 +18,7 @@
 #include "access/tupmacs.h"
 #include "access/xact.h"
 #include "catalog/indexing.h"
+#include "catalog/namespace.h"
 #include "commands/sequence.h"
 #include "distributed/colocation_utils.h"
 #include "distributed/connection_management.h"
@@ -53,7 +54,7 @@ static Datum ActivateNode(char *nodeName, int nodePort);
 static void RemoveNodeFromCluster(char *nodeName, int32 nodePort);
 static Datum AddNodeMetadata(char *nodeName, int32 nodePort, int32 groupId,
 							 char *nodeRack, bool hasMetadata, bool isActive,
-							 bool *nodeAlreadyExists);
+							 Oid nodeRole, bool *nodeAlreadyExists);
 static void SetNodeState(char *nodeName, int32 nodePort, bool isActive);
 static HeapTuple GetNodeTuple(char *nodeName, int32 nodePort);
 static Datum GenerateNodeTuple(WorkerNode *workerNode);
@@ -61,7 +62,7 @@ static int32 GetNextGroupId(void);
 static uint32 GetMaxGroupId(void);
 static int GetNextNodeId(void);
 static void InsertNodeRow(int nodeid, char *nodename, int32 nodeport, uint32 groupId,
-						  char *nodeRack, bool hasMetadata, bool isActive);
+						  char *nodeRack, bool hasMetadata, bool isActive, Oid nodeRole);
 static void DeleteNodeRow(char *nodename, int32 nodeport);
 static List * ParseWorkerNodeFileAndRename(void);
 static WorkerNode * TupleToWorkerNode(TupleDesc tupleDescriptor, HeapTuple heapTuple);
@@ -86,7 +87,8 @@ master_add_node(PG_FUNCTION_ARGS)
 	text *nodeName = PG_GETARG_TEXT_P(0);
 	int32 nodePort = PG_GETARG_INT32(1);
 	char *nodeNameString = text_to_cstring(nodeName);
-	int32 groupId = 0;
+	int32 groupId = PG_GETARG_INT32(2);
+	Oid nodeRole = PG_GETARG_OID(3);
 	char *nodeRack = WORKER_DEFAULT_RACK;
 	bool hasMetadata = false;
 	bool isActive = false;
@@ -96,7 +98,7 @@ master_add_node(PG_FUNCTION_ARGS)
 	CheckCitusVersion(ERROR);
 
 	nodeRecord = AddNodeMetadata(nodeNameString, nodePort, groupId, nodeRack,
-								 hasMetadata, isActive, &nodeAlreadyExists);
+								 hasMetadata, isActive, nodeRole, &nodeAlreadyExists);
 
 	/*
 	 * After adding new node, if the node did not already exist, we will activate
@@ -123,7 +125,8 @@ master_add_inactive_node(PG_FUNCTION_ARGS)
 	text *nodeName = PG_GETARG_TEXT_P(0);
 	int32 nodePort = PG_GETARG_INT32(1);
 	char *nodeNameString = text_to_cstring(nodeName);
-	int32 groupId = 0;
+	int32 groupId = PG_GETARG_INT32(2);
+	Oid nodeRole = PG_GETARG_OID(3);
 	char *nodeRack = WORKER_DEFAULT_RACK;
 	bool hasMetadata = false;
 	bool isActive = false;
@@ -133,7 +136,7 @@ master_add_inactive_node(PG_FUNCTION_ARGS)
 	CheckCitusVersion(ERROR);
 
 	nodeRecord = AddNodeMetadata(nodeNameString, nodePort, groupId, nodeRack,
-								 hasMetadata, isActive, &nodeAlreadyExists);
+								 hasMetadata, isActive, nodeRole, &nodeAlreadyExists);
 
 	PG_RETURN_CSTRING(nodeRecord);
 }
@@ -322,6 +325,7 @@ master_initialize_node_metadata(PG_FUNCTION_ARGS)
 	ListCell *workerNodeCell = NULL;
 	List *workerNodes = NULL;
 	bool nodeAlreadyExists = false;
+	Oid nodeRole = InvalidOid;  /* nodeRole doesn't exist when this function is called */
 
 	CheckCitusVersion(ERROR);
 
@@ -332,7 +336,7 @@ master_initialize_node_metadata(PG_FUNCTION_ARGS)
 
 		AddNodeMetadata(workerNode->workerName, workerNode->workerPort, 0,
 						workerNode->workerRack, false, workerNode->isActive,
-						&nodeAlreadyExists);
+						nodeRole, &nodeAlreadyExists);
 	}
 
 	PG_RETURN_BOOL(true);
@@ -572,7 +576,7 @@ RemoveNodeFromCluster(char *nodeName, int32 nodePort)
  */
 static Datum
 AddNodeMetadata(char *nodeName, int32 nodePort, int32 groupId, char *nodeRack,
-				bool hasMetadata, bool isActive, bool *nodeAlreadyExists)
+				bool hasMetadata, bool isActive, Oid nodeRole, bool *nodeAlreadyExists)
 {
 	Relation pgDistNode = NULL;
 	int nextNodeIdInt = 0;
@@ -624,7 +628,7 @@ AddNodeMetadata(char *nodeName, int32 nodePort, int32 groupId, char *nodeRack,
 	nextNodeIdInt = GetNextNodeId();
 
 	InsertNodeRow(nextNodeIdInt, nodeName, nodePort, groupId, nodeRack, hasMetadata,
-				  isActive);
+				  isActive, nodeRole);
 
 	workerNode = FindWorkerNode(nodeName, nodePort);
 
@@ -751,6 +755,7 @@ GenerateNodeTuple(WorkerNode *workerNode)
 	values[Anum_pg_dist_node_noderack - 1] = CStringGetTextDatum(workerNode->workerRack);
 	values[Anum_pg_dist_node_hasmetadata - 1] = BoolGetDatum(workerNode->hasMetadata);
 	values[Anum_pg_dist_node_isactive - 1] = BoolGetDatum(workerNode->isActive);
+	values[Anum_pg_dist_node_noderole - 1] = ObjectIdGetDatum(workerNode->nodeRole);
 
 	/* open shard relation and insert new tuple */
 	pgDistNode = heap_open(DistNodeRelationId(), AccessShareLock);
@@ -888,7 +893,7 @@ EnsureCoordinator(void)
  */
 static void
 InsertNodeRow(int nodeid, char *nodeName, int32 nodePort, uint32 groupId, char *nodeRack,
-			  bool hasMetadata, bool isActive)
+			  bool hasMetadata, bool isActive, Oid nodeRole)
 {
 	Relation pgDistNode = NULL;
 	TupleDesc tupleDescriptor = NULL;
@@ -907,6 +912,19 @@ InsertNodeRow(int nodeid, char *nodeName, int32 nodePort, uint32 groupId, char *
 	values[Anum_pg_dist_node_noderack - 1] = CStringGetTextDatum(nodeRack);
 	values[Anum_pg_dist_node_hasmetadata - 1] = BoolGetDatum(hasMetadata);
 	values[Anum_pg_dist_node_isactive - 1] = BoolGetDatum(isActive);
+
+	if (nodeRole == InvalidOid)
+	{
+		/*
+		 * TODO: Make sure this will either error out or use the default once the
+		 * column exists
+		 */
+		isNulls[Anum_pg_dist_node_noderole - 1] = true;
+	}
+	else
+	{
+		values[Anum_pg_dist_node_noderole - 1] = ObjectIdGetDatum(nodeRole);
+	}
 
 	/* open shard relation and insert new tuple */
 	pgDistNode = heap_open(DistNodeRelationId(), AccessExclusiveLock);
@@ -1147,6 +1165,8 @@ TupleToWorkerNode(TupleDesc tupleDescriptor, HeapTuple heapTuple)
 									 tupleDescriptor, &isNull);
 	Datum isActive = heap_getattr(heapTuple, Anum_pg_dist_node_isactive,
 								  tupleDescriptor, &isNull);
+	Datum nodeRole = heap_getattr(heapTuple, Anum_pg_dist_node_noderole,
+								  tupleDescriptor, &isNull);
 
 	Assert(!HeapTupleHasNulls(heapTuple));
 
@@ -1158,6 +1178,7 @@ TupleToWorkerNode(TupleDesc tupleDescriptor, HeapTuple heapTuple)
 	strlcpy(workerNode->workerRack, TextDatumGetCString(nodeRack), WORKER_LENGTH);
 	workerNode->hasMetadata = DatumGetBool(hasMetadata);
 	workerNode->isActive = DatumGetBool(isActive);
+	workerNode->nodeRole = DatumGetObjectId(nodeRole);
 
 	return workerNode;
 }

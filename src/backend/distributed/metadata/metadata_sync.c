@@ -408,7 +408,7 @@ NodeListInsertCommand(List *workerNodeList)
 	/* generate the query without any values yet */
 	appendStringInfo(nodeListInsertCommand,
 					 "INSERT INTO pg_dist_node (nodeid, groupid, nodename, nodeport, "
-					 "noderack, hasmetadata, isactive) VALUES ");
+					 "noderack, hasmetadata, isactive, noderole) VALUES ");
 
 	/* iterate over the worker nodes, add the values */
 	foreach(workerNodeCell, workerNodeList)
@@ -417,15 +417,35 @@ NodeListInsertCommand(List *workerNodeList)
 		char *hasMetadataString = workerNode->hasMetadata ? "TRUE" : "FALSE";
 		char *isActiveString = workerNode->isActive ? "TRUE" : "FALSE";
 
+		char *nodeRoleString = NULL;
+
+		if (workerNode->nodeRole != InvalidOid)
+		{
+			Datum nodeRoleOidDatum = ObjectIdGetDatum(workerNode->nodeRole);
+			Datum nodeRoleStringDatum = DirectFunctionCall1(enum_out, nodeRoleOidDatum);
+			nodeRoleString = DatumGetCString(nodeRoleStringDatum);
+		}
+		else
+		{
+			/*
+			 * Hack because master_initialize_node_metadata calls this before nodeRole
+			 * has been created. The user will never have the opportunity to see this
+			 * error out, when master_initialize_node_metadata runs there are no other
+			 * nodes with metadata to run nodeListInsertCommand on.
+			 */
+			nodeRoleString = "does-not-exist-will-throw-error";
+		}
+
 		appendStringInfo(nodeListInsertCommand,
-						 "(%d, %d, %s, %d, %s, %s, %s)",
+						 "(%d, %d, %s, %d, %s, %s, %s, '%s'::noderole)",
 						 workerNode->nodeId,
 						 workerNode->groupId,
 						 quote_literal_cstr(workerNode->workerName),
 						 workerNode->workerPort,
 						 quote_literal_cstr(workerNode->workerRack),
 						 hasMetadataString,
-						 isActiveString);
+						 isActiveString,
+						 nodeRoleString);
 
 		processedWorkerNodeCount++;
 		if (processedWorkerNodeCount != workerCount)
