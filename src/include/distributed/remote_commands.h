@@ -19,6 +19,8 @@
 
 struct pg_result; /* target of the PGresult typedef */
 
+typedef struct MultiConnectionWaiter MultiConnectionWaiter;
+
 /* GUC, determining whether statements sent to remote nodes are logged */
 extern bool LogRemoteCommands;
 
@@ -51,6 +53,12 @@ extern struct pg_result * GetRemoteCommandResult(MultiConnection *connection,
 extern bool PutRemoteCopyData(MultiConnection *connection, const char *buffer,
 							  int nbytes);
 extern bool PutRemoteCopyEnd(MultiConnection *connection, const char *errormsg);
+
+/* waiting for multiple command results */
+extern MultiConnectionWaiter * CreateMultiConnectionWaiter(List *connectionList);
+extern List * AwaitResultsOnConnections(MultiConnectionWaiter *waiter,
+										bool raiseInterrupts);
+extern void FreeMultiConnectionWaiter(MultiConnectionWaiter *waiter);
 
 
 #endif /* REMOTE_COMMAND_H */
