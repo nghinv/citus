@@ -1696,7 +1696,15 @@ RouterSelectJob(Query *originalQuery, RelationRestrictionContext *restrictionCon
 
 	pg_get_query_def(originalQuery, queryString);
 
-	task = CreateTask(ROUTER_TASK);
+	if (originalQuery->commandType == CMD_UPDATE)
+	{
+		task = CreateTask(MODIFY_TASK);
+	}
+	else
+	{
+		task = CreateTask(ROUTER_TASK);
+	}
+
 	task->queryString = queryString->data;
 	task->anchorShardId = shardId;
 	task->taskPlacementList = placementList;
