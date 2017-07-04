@@ -1753,7 +1753,14 @@ RouterSelectQuery(Query *originalQuery, RelationRestrictionContext *restrictionC
 		/* no shard is present or all shards are pruned out case will be handled later */
 		if (prunedShardList == NIL)
 		{
-			continue;
+			if (commandType == CMD_UPDATE)
+			{
+				return false;
+			}
+			else
+			{
+				continue;
+			}
 		}
 
 		shardsPresent = true;
