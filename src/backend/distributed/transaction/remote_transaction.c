@@ -640,6 +640,10 @@ void
 CoordinatedRemoteTransactionsPrepare(void)
 {
 	dlist_iter iter;
+	bool raiseInterrupts = true;
+	MultiConnectionWaiter *waiter = NULL;
+	List *connectionList = NIL;
+	List *readyList = NIL;
 
 	/* issue PREPARE TRANSACTION; to all relevant remote nodes */
 
@@ -659,24 +663,31 @@ CoordinatedRemoteTransactionsPrepare(void)
 		}
 
 		StartRemoteTransactionPrepare(connection);
+
+		connectionList = lappend(connectionList, connection);
 	}
 
-	/* XXX: Should perform network IO for all connections in a non-blocking manner */
+	waiter = CreateMultiConnectionWaiter(connectionList);
 
-	/* Wait for result */
-	dlist_foreach(iter, &InProgressTransactions)
+	while ((readyList = AwaitResultsOnConnections(waiter, raiseInterrupts)) != NIL)
 	{
-		MultiConnection *connection = dlist_container(MultiConnection, transactionNode,
-													  iter.cur);
-		RemoteTransaction *transaction = &connection->remoteTransaction;
+		ListCell *connectionCell = NULL;
 
-		if (transaction->transactionState != REMOTE_TRANS_PREPARING)
+		foreach(connectionCell, readyList)
 		{
-			continue;
-		}
+			MultiConnection *connection = (MultiConnection *) lfirst(connectionCell);
+			RemoteTransaction *transaction = &connection->remoteTransaction;
 
-		FinishRemoteTransactionPrepare(connection);
+			if (transaction->transactionState != REMOTE_TRANS_PREPARING)
+			{
+				continue;
+			}
+
+			FinishRemoteTransactionPrepare(connection);
+		}
 	}
+
+	FreeMultiConnectionWaiter(waiter);
 
 	CurrentCoordinatedTransactionState = COORD_TRANS_PREPARED;
 }
@@ -694,6 +705,10 @@ void
 CoordinatedRemoteTransactionsCommit(void)
 {
 	dlist_iter iter;
+	bool raiseInterrupts = false;
+	MultiConnectionWaiter *waiter = NULL;
+	List *connectionList = NIL;
+	List *readyList = NIL;
 
 	/*
 	 * Before starting to commit on any of the nodes - after which we can't
@@ -723,28 +738,35 @@ CoordinatedRemoteTransactionsCommit(void)
 		}
 
 		StartRemoteTransactionCommit(connection);
+
+		connectionList = lappend(connectionList, connection);
 	}
 
-	/* XXX: Should perform network IO for all connections in a non-blocking manner */
+	waiter = CreateMultiConnectionWaiter(connectionList);
 
-	/* wait for the replies to the commands to come in */
-	dlist_foreach(iter, &InProgressTransactions)
+	while ((readyList = AwaitResultsOnConnections(waiter, raiseInterrupts)) != NIL)
 	{
-		MultiConnection *connection = dlist_container(MultiConnection, transactionNode,
-													  iter.cur);
-		RemoteTransaction *transaction = &connection->remoteTransaction;
+		ListCell *connectionCell = NULL;
 
-		/* nothing to do if not committing / aborting */
-		if (transaction->transactionState != REMOTE_TRANS_1PC_COMMITTING &&
-			transaction->transactionState != REMOTE_TRANS_2PC_COMMITTING &&
-			transaction->transactionState != REMOTE_TRANS_1PC_ABORTING &&
-			transaction->transactionState != REMOTE_TRANS_2PC_ABORTING)
+		foreach(connectionCell, readyList)
 		{
-			continue;
-		}
+			MultiConnection *connection = (MultiConnection *) lfirst(connectionCell);
+			RemoteTransaction *transaction = &connection->remoteTransaction;
 
-		FinishRemoteTransactionCommit(connection);
+			/* nothing to do if not committing / aborting */
+			if (transaction->transactionState != REMOTE_TRANS_1PC_COMMITTING &&
+				transaction->transactionState != REMOTE_TRANS_2PC_COMMITTING &&
+				transaction->transactionState != REMOTE_TRANS_1PC_ABORTING &&
+				transaction->transactionState != REMOTE_TRANS_2PC_ABORTING)
+			{
+				continue;
+			}
+
+			FinishRemoteTransactionCommit(connection);
+		}
 	}
+
+	FreeMultiConnectionWaiter(waiter);
 }
 
 
@@ -759,6 +781,10 @@ void
 CoordinatedRemoteTransactionsAbort(void)
 {
 	dlist_iter iter;
+	bool raiseInterrupts = false;
+	MultiConnectionWaiter *waiter = NULL;
+	List *connectionList = NIL;
+	List *readyList = NIL;
 
 	/* asynchronously send ROLLBACK [PREPARED] */
 	dlist_foreach(iter, &InProgressTransactions)
@@ -776,25 +802,32 @@ CoordinatedRemoteTransactionsAbort(void)
 		}
 
 		StartRemoteTransactionAbort(connection);
+
+		connectionList = lappend(connectionList, connection);
 	}
 
-	/* XXX: Should perform network IO for all connections in a non-blocking manner */
+	waiter = CreateMultiConnectionWaiter(connectionList);
 
-	/* and wait for the results */
-	dlist_foreach(iter, &InProgressTransactions)
+	while ((readyList = AwaitResultsOnConnections(waiter, raiseInterrupts)) != NIL)
 	{
-		MultiConnection *connection = dlist_container(MultiConnection, transactionNode,
-													  iter.cur);
-		RemoteTransaction *transaction = &connection->remoteTransaction;
+		ListCell *connectionCell = NULL;
 
-		if (transaction->transactionState != REMOTE_TRANS_1PC_ABORTING &&
-			transaction->transactionState != REMOTE_TRANS_2PC_ABORTING)
+		foreach(connectionCell, readyList)
 		{
-			continue;
-		}
+			MultiConnection *connection = (MultiConnection *) lfirst(connectionCell);
+			RemoteTransaction *transaction = &connection->remoteTransaction;
 
-		FinishRemoteTransactionAbort(connection);
+			if (transaction->transactionState != REMOTE_TRANS_1PC_ABORTING &&
+				transaction->transactionState != REMOTE_TRANS_2PC_ABORTING)
+			{
+				continue;
+			}
+
+			FinishRemoteTransactionAbort(connection);
+		}
 	}
+
+	FreeMultiConnectionWaiter(waiter);
 }
 
 
