@@ -1697,7 +1697,11 @@ RouterSelectJob(Query *originalQuery, RelationRestrictionContext *restrictionCon
 
 	if (originalQuery->commandType == CMD_UPDATE)
 	{
+		Oid distributedTableId = ExtractFirstDistributedTableId(originalQuery);
+		DistTableCacheEntry *cacheEntry = DistributedTableCacheEntry(distributedTableId);
+
 		task = CreateTask(MODIFY_TASK);
+		task->replicationModel = cacheEntry->replicationModel;
 	}
 	else
 	{
