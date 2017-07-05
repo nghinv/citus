@@ -1685,7 +1685,6 @@ RouterSelectJob(Query *originalQuery, RelationRestrictionContext *restrictionCon
 									  &placementList, &shardId, &relationShardList,
 									  replacePrunedQueryWithDummy);
 
-
 	if (!queryRoutable)
 	{
 		*returnQueryRoutable = false;
@@ -1711,6 +1710,7 @@ RouterSelectJob(Query *originalQuery, RelationRestrictionContext *restrictionCon
 	task->relationShardList = relationShardList;
 
 	job->taskList = list_make1(task);
+	job->requiresMasterEvaluation = RequiresMasterEvaluation(originalQuery);
 
 	*returnQueryRoutable = true;
 
