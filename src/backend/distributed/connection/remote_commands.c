@@ -775,7 +775,8 @@ AwaitResultsOnConnections(MultiConnectionWaiter *waiter, bool raiseInterrupts)
 	/* if we already detected some failures we skip waiting */
 	if (!foundReadyConnections)
 	{
-		AddWaitEventToSet(waitEventSet, WL_POSTMASTER_DEATH, PGINVALID_SOCKET, NULL, NULL);
+		AddWaitEventToSet(waitEventSet, WL_POSTMASTER_DEATH, PGINVALID_SOCKET, NULL,
+						  NULL);
 		AddWaitEventToSet(waitEventSet, WL_LATCH_SET, PGINVALID_SOCKET, MyLatch, NULL);
 
 		PG_TRY();
@@ -790,7 +791,6 @@ AwaitResultsOnConnections(MultiConnectionWaiter *waiter, bool raiseInterrupts)
 			PG_RE_THROW();
 		}
 		PG_END_TRY();
-
 	}
 
 	FreeWaitEventSet(waitEventSet);
@@ -814,7 +814,6 @@ AwaitResultsOnConnections(MultiConnectionWaiter *waiter, bool raiseInterrupts)
 	}
 
 	return readyConnectionList;
-
 }
 
 
