@@ -47,7 +47,12 @@ struct MultiConnectionWaiter
 /* GUC, determining whether statements sent to remote nodes are logged */
 bool LogRemoteCommands = false;
 
+
 static bool FinishConnectionIO(MultiConnection *connection, bool raiseInterrupts);
+static void WaitForReadyConnections(MultiConnectionWaiter *waiter,
+									WaitEventSet *waitEventSet, bool *connectionReady,
+									bool raiseInterrupts);
+
 
 /* simple helpers */
 
@@ -692,11 +697,11 @@ CreateMultiConnectionWaiter(List *connectionList)
 
 /*
  * AwaitResultsOnConnections waits for I/O events and returns a list of connections
- * that which finished or failed. Each connection is returned at most once across
- * multiple calls.
+ * that finished or failed. Each connection is returned at most once across multiple
+ * calls.
  *
- * If all connections have been returned, AwaitResultsOnConnections returns an
- * empty list.
+ * When all connections are ready and were returned as part of a list,
+ * AwaitResultsOnConnections returns an empty list.
  *
  * To keep track of which connections were already returned, pending connections
  * are moved to the end of the connections array, starting at currentOffset.
@@ -713,7 +718,6 @@ AwaitResultsOnConnections(MultiConnectionWaiter *waiter, bool raiseInterrupts)
 	int pendingConnectionsStartIndex = waiter->currentOffset;
 	int pendingConnectionCount = connectionCount - pendingConnectionsStartIndex;
 	int connectionIndex = 0;
-	bool cancelled = false;
 
 	if (waiter->currentOffset == connectionCount)
 	{
@@ -768,16 +772,73 @@ AwaitResultsOnConnections(MultiConnectionWaiter *waiter, bool raiseInterrupts)
 		}
 	}
 
-	AddWaitEventToSet(waitEventSet, WL_POSTMASTER_DEATH, PGINVALID_SOCKET, NULL, NULL);
-	AddWaitEventToSet(waitEventSet, WL_LATCH_SET, PGINVALID_SOCKET, MyLatch, NULL);
+	/* if we already detected some failures we skip waiting */
+	if (!foundReadyConnections)
+	{
+		AddWaitEventToSet(waitEventSet, WL_POSTMASTER_DEATH, PGINVALID_SOCKET, NULL, NULL);
+		AddWaitEventToSet(waitEventSet, WL_LATCH_SET, PGINVALID_SOCKET, MyLatch, NULL);
+
+		PG_TRY();
+		{
+			WaitForReadyConnections(waiter, waitEventSet, connectionReady,
+									raiseInterrupts);
+		}
+		PG_CATCH();
+		{
+			/* make sure the epoll file descriptor is closed */
+			FreeWaitEventSet(waitEventSet);
+			PG_RE_THROW();
+		}
+		PG_END_TRY();
+
+	}
+
+	FreeWaitEventSet(waitEventSet);
+
+	/* move connections that are not yet ready to the end of the array */
+	for (connectionIndex = waiter->currentOffset; connectionIndex < connectionCount;
+		 connectionIndex++)
+	{
+		if (connectionReady[connectionIndex])
+		{
+			MultiConnection *connection = allConnections[connectionIndex];
+
+			/* connection is ready, add to ready list */
+			readyConnectionList = lappend(readyConnectionList, connection);
+
+			/* reuse the slot; move a non-ready connection from the front */
+			allConnections[connectionIndex] = allConnections[waiter->currentOffset];
+
+			waiter->currentOffset++;
+		}
+	}
+
+	return readyConnectionList;
+
+}
+
+
+/*
+ * WaitForReadyConnections waits for connections using the given WaitEventSet.
+ */
+static void
+WaitForReadyConnections(MultiConnectionWaiter *waiter, WaitEventSet *waitEventSet,
+						bool *connectionReady, bool raiseInterrupts)
+{
+	int connectionCount = waiter->connectionCount;
+	int pendingConnectionsStartIndex = waiter->currentOffset;
+	int pendingConnectionCount = connectionCount - pendingConnectionsStartIndex;
+	bool foundReadyConnections = false;
+	bool cancelled = false;
+	int connectionIndex = 0;
 
 	while (!foundReadyConnections)
 	{
 		int eventIndex = 0;
 		int eventCount = 0;
-		long timeout = 1000;
+		long timeout = -1;
 
-		/* wait for I/O events for up to 1 second */
+		/* wait for I/O events */
 #if (PG_VERSION_NUM >= 100000)
 		eventCount = WaitEventSetWait(waitEventSet, timeout, waiter->events,
 									  pendingConnectionCount, WAIT_EVENT_CLIENT_READ);
@@ -785,11 +846,6 @@ AwaitResultsOnConnections(MultiConnectionWaiter *waiter, bool raiseInterrupts)
 		eventCount = WaitEventSetWait(waitEventSet, timeout, waiter->events,
 									  pendingConnectionCount);
 #endif
-		if (eventCount == 0)
-		{
-			/* timeout, try again */
-			continue;
-		}
 
 		for (; eventIndex < eventCount; eventIndex++)
 		{
@@ -806,7 +862,6 @@ AwaitResultsOnConnections(MultiConnectionWaiter *waiter, bool raiseInterrupts)
 			{
 				ResetLatch(MyLatch);
 
-				/* if allowed, raise errors */
 				if (raiseInterrupts)
 				{
 					CHECK_FOR_INTERRUPTS();
@@ -872,28 +927,6 @@ AwaitResultsOnConnections(MultiConnectionWaiter *waiter, bool raiseInterrupts)
 			connectionReady[connectionIndex] = true;
 		}
 	}
-
-	/* move connections that are not yet ready to the end of the array */
-	for (connectionIndex = waiter->currentOffset; connectionIndex < connectionCount;
-		 connectionIndex++)
-	{
-		if (connectionReady[connectionIndex])
-		{
-			MultiConnection *connection = allConnections[connectionIndex];
-
-			/* connection is ready, add to ready list */
-			readyConnectionList = lappend(readyConnectionList, connection);
-
-			/* reuse the slot; move a non-ready connection from the front */
-			allConnections[connectionIndex] = allConnections[waiter->currentOffset];
-
-			waiter->currentOffset++;
-		}
-	}
-
-	FreeWaitEventSet(waitEventSet);
-
-	return readyConnectionList;
 }
 
 
