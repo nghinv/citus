@@ -1,6 +1,6 @@
 /*-------------------------------------------------------------------------
  *
- * transaction_management.c
+ * coordinated_transaction_management.c
  *
  *   Transaction management for Citus.  Most of the work is delegated to other
  *   subsystems, this files, and especially CoordinatedTransactionCallback,
@@ -20,9 +20,9 @@
 #include "access/twophase.h"
 #include "access/xact.h"
 #include "distributed/connection_management.h"
+#include "distributed/coordinated_transaction_management.h"
 #include "distributed/hash_helpers.h"
 #include "distributed/multi_shard_transaction.h"
-#include "distributed/transaction_management.h"
 #include "distributed/placement_connection.h"
 #include "utils/hsearch.h"
 #include "utils/guc.h"

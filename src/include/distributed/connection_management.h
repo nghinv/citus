@@ -11,7 +11,7 @@
 #ifndef CONNECTION_MANAGMENT_H
 #define CONNECTION_MANAGMENT_H
 
-#include "distributed/transaction_management.h"
+#include "distributed/coordinated_transaction_management.h"
 #include "distributed/remote_transaction.h"
 #include "lib/ilist.h"
 #include "utils/hsearch.h"

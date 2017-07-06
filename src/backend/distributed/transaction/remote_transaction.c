@@ -16,10 +16,10 @@
 
 #include "access/xact.h"
 #include "distributed/connection_management.h"
+#include "distributed/coordinated_transaction_management.h"
 #include "distributed/metadata_cache.h"
 #include "distributed/remote_commands.h"
 #include "distributed/remote_transaction.h"
-#include "distributed/transaction_management.h"
 #include "distributed/transaction_recovery.h"
 #include "distributed/worker_manager.h"
 #include "utils/hsearch.h"

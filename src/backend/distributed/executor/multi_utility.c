@@ -36,6 +36,7 @@
 #include "commands/prepare.h"
 #include "distributed/citus_ruleutils.h"
 #include "distributed/colocation_utils.h"
+#include "distributed/coordinated_transaction_management.h"
 #include "distributed/master_metadata_utility.h"
 #include "distributed/master_protocol.h"
 #include "distributed/metadata_cache.h"
@@ -49,7 +50,6 @@
 #include "distributed/multi_utility.h" /* IWYU pragma: keep */
 #include "distributed/pg_dist_partition.h"
 #include "distributed/resource_lock.h"
-#include "distributed/transaction_management.h"
 #include "distributed/transmit.h"
 #include "distributed/worker_protocol.h"
 #include "distributed/worker_transaction.h"

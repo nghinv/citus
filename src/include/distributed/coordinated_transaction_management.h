@@ -1,13 +1,13 @@
 /*-------------------------------------------------------------------------
- * transaction_management.h
+ * coordinated_transaction_management.h
  *
  * Copyright (c) 2016, Citus Data, Inc.
  *
  *-------------------------------------------------------------------------
  */
 
-#ifndef TRANSACTION_MANAGMENT_H
-#define TRANSACTION_MANAGMENT_H
+#ifndef COORDINATED_TRANSACTION_MANAGMENT_H
+#define COORDINATED_TRANSACTION_MANAGMENT_H
 
 #include "lib/ilist.h"
 
@@ -78,4 +78,4 @@ extern void CoordinatedTransactionUse2PC(void);
 extern void InitializeTransactionManagement(void);
 
 
-#endif /*  TRANSACTION_MANAGMENT_H */
+#endif /*  COORDINATED_TRANSACTION_MANAGMENT_H */
