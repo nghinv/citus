@@ -3167,9 +3167,6 @@ get_update_query_def(Query *query, deparse_context *context)
 
 		ExtractRangeTblExtraData(rte, NULL, &fragmentSchemaName, &fragmentTableName, NULL);
 
-		Oid namespaceId = get_namespace_oid(fragmentSchemaName, false);
-		rte->relid = get_relname_relid(rte->eref->aliasname, namespaceId);
-
 		/* Use schema and table name from the remote alias */
 		appendStringInfo(buf, "UPDATE %s%s",
 						 only_marker(rte),

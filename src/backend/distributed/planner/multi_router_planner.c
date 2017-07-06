@@ -1848,7 +1848,10 @@ RouterSelectQuery(Query *originalQuery, RelationRestrictionContext *restrictionC
 		return false;
 	}
 
-	UpdateRelationToShardNames((Node *) originalQuery, *relationShardList);
+	if (!(RequiresMasterEvaluation(originalQuery) && commandType == CMD_UPDATE))
+	{
+		UpdateRelationToShardNames((Node *) originalQuery, *relationShardList);
+	}
 
 	*placementList = workerList;
 	*anchorShardId = shardId;

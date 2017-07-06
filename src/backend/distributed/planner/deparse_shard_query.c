@@ -92,13 +92,13 @@ RebuildQueryStrings(Query *originalQuery, List *taskList)
 
 		if (query->commandType == CMD_UPDATE)
 		{
-			pg_get_query_def(query, newQueryString);
+			List *relationShardList = task->relationShardList;
+
+			UpdateRelationToShardNames((Node *) query, relationShardList);
 		}
-		else
-		{
-			deparse_shard_query(query, relationId, task->anchorShardId,
-								newQueryString);
-		}
+
+		deparse_shard_query(query, relationId, task->anchorShardId,
+							newQueryString);
 
 		ereport(DEBUG4, (errmsg("distributed statement: %s",
 								newQueryString->data)));
