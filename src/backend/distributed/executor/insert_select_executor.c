@@ -16,7 +16,7 @@
 #include "distributed/multi_executor.h"
 #include "distributed/multi_physical_planner.h"
 #include "distributed/multi_planner.h"
-#include "distributed/transaction_management.h"
+#include "distributed/coordinated_transaction_management.h"
 #include "executor/executor.h"
 #include "nodes/execnodes.h"
 #include "nodes/makefuncs.h"

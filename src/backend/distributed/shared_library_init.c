@@ -23,6 +23,7 @@
 #include "distributed/connection_management.h"
 #include "distributed/connection_management.h"
 #include "distributed/coordinated_transaction_management.h"
+#include "distributed/distributed_transaction_management.h"
 #include "distributed/maintenanced.h"
 #include "distributed/master_metadata_utility.h"
 #include "distributed/master_protocol.h"
@@ -173,6 +174,7 @@ _PG_init(void)
 
 	/* initialize coordinated transaction management */
 	InitializeTransactionManagement();
+	InitializeDistributedTransactionManagement();
 	InitializeConnectionManagement();
 	InitPlacementConnectionManagement();
 
@@ -197,6 +199,7 @@ void
 StartupCitusBackend(void)
 {
 	InitializeMaintenanceDaemonBackend();
+	InitializeDistributedTransactionManagementBackend();
 }
 
 

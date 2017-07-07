@@ -21,6 +21,7 @@
 #include "access/xact.h"
 #include "distributed/connection_management.h"
 #include "distributed/coordinated_transaction_management.h"
+#include "distributed/distributed_transaction_management.h"
 #include "distributed/hash_helpers.h"
 #include "distributed/multi_shard_transaction.h"
 #include "distributed/placement_connection.h"
@@ -168,6 +169,8 @@ CoordinatedTransactionCallback(XactEvent event, void *arg)
 			XactModificationLevel = XACT_MODIFICATION_NONE;
 			dlist_init(&InProgressTransactions);
 			CoordinatedTransactionUses2PC = false;
+
+			UnSetDistributedTransactionId();
 		}
 		break;
 
@@ -204,6 +207,7 @@ CoordinatedTransactionCallback(XactEvent event, void *arg)
 			dlist_init(&InProgressTransactions);
 			CoordinatedTransactionUses2PC = false;
 			subXactAbortAttempted = false;
+			UnSetDistributedTransactionId();
 		}
 		break;
 
