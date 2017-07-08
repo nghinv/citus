@@ -62,7 +62,11 @@ typedef struct DistributedTransactionBackendData
 typedef struct DistributedTransactionShmemData
 {
 	int trancheId;
+#if (PG_VERSION_NUM < 100000)
 	LWLockTranche lockTranche;
+#else
+	NamedLWLockTranche namedLockTranche;
+#endif
 	LWLock lock;
 
 	pg_atomic_uint64 nextTransactionId;
@@ -249,6 +253,7 @@ static void
 DistributedTransactionManagementShmemInit(void)
 {
 	bool alreadyInitialized = false;
+	char *trancheName = "Distributed Transaction Management";
 
 	/* we may update the shmem, acquire lock exclusively */
 	LWLockAcquire(AddinShmemInitLock, LW_EXCLUSIVE);
@@ -261,7 +266,12 @@ DistributedTransactionManagementShmemInit(void)
 
 	if (!alreadyInitialized)
 	{
-		LWLockTranche *tranche = &distributedTransactionShmemData->lockTranche;
+#if (PG_VERSION_NUM < 100000)
+		LWLockTranche *lockTranche = &distributedTransactionShmemData->lockTranche;
+#else
+		NamedLWLockTranche *namedLockTranche =
+			&distributedTransactionShmemData->namedLockTranche;
+#endif
 
 		/* start by zeroing out all the memory */
 		memset(distributedTransactionShmemData, 0,
@@ -269,14 +279,21 @@ DistributedTransactionManagementShmemInit(void)
 
 		distributedTransactionShmemData->trancheId = LWLockNewTrancheId();
 
-		/* we only need a single lock */
-		tranche->array_base = &distributedTransactionShmemData->lock;
-		tranche->array_stride = sizeof(LWLock);
+#if (PG_VERSION_NUM < 100000)
 
-		tranche->name = "Distributed Transaction Management";
-		LWLockRegisterTranche(distributedTransactionShmemData->trancheId, tranche);
+		/* we only need a single lock */
+		lockTranche->array_base = &distributedTransactionShmemData->lock;
+		lockTranche->array_stride = sizeof(LWLock);
+		lockTranche->name = trancheName;
+
+		LWLockRegisterTranche(distributedTransactionShmemData->trancheId, lockTranche);
 		LWLockInitialize(&distributedTransactionShmemData->lock,
 						 distributedTransactionShmemData->trancheId);
+#else
+		LWLockRegisterTranche(namedLockTranche->trancheId, trancheName);
+		LWLockInitialize(&distributedTransactionShmemData->lock,
+						 namedLockTranche->trancheId);
+#endif
 
 		/* start the distributed transaction ids from 1 */
 		pg_atomic_init_u64(&distributedTransactionShmemData->nextTransactionId, 1);
