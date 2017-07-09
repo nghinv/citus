@@ -75,7 +75,23 @@ SELECT
 FROM 
 	get_distributed_transaction_id() AS f(databaseId oid, nodeId bigint, tx bigint, time timestamptz);
 
+-- test get_next_distributed_transaction_id as well
+BEGIN;
+	SELECT assign_distributed_transaction_id(get_next_distributed_transaction_id(), 1, '2015-01-01 00:00:00+0');
 
+	SELECT 
+		nodeid, tx, time 
+	FROM 
+		get_distributed_transaction_id() AS f(databaseId oid, nodeId bigint, tx bigint, time timestamptz);
+	
+	SELECT assign_distributed_transaction_id(get_next_distributed_transaction_id(), 2, '2016-01-01 00:00:00+0');
+
+	SELECT 
+		nodeid, tx, time 
+	FROM 
+		get_distributed_transaction_id() AS f(databaseId oid, nodeId bigint, tx bigint, time timestamptz);
+	
+COMMIT;
 -- we should also see that a new connection means an uninitialized transaction ids
 BEGIN;
 	
@@ -93,6 +109,7 @@ BEGIN;
 		nodeid, tx, time 
 	FROM 
 		get_distributed_transaction_id() AS f(databaseId oid, nodeId bigint, tx bigint, time timestamptz);
+
 
 -- set back to the original zone
 SET TIME ZONE DEFAULT;

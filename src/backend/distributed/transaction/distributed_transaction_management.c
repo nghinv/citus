@@ -91,6 +91,7 @@ static size_t DistributedTransactionManagementShmemSize(void);
 
 PG_FUNCTION_INFO_V1(assign_distributed_transaction_id);
 PG_FUNCTION_INFO_V1(get_distributed_transaction_id);
+PG_FUNCTION_INFO_V1(get_next_distributed_transaction_id); /* only for test purposes */
 
 
 /*
@@ -162,6 +163,17 @@ get_distributed_transaction_id(PG_FUNCTION_ARGS)
 											  transactionId, timestamp);
 
 	PG_RETURN_DATUM(distributedTransactionId);
+}
+
+
+/*
+ * Should only be used for testing.
+ * Wrapper around GetNextDistributedTransactionId()
+ */
+Datum
+get_next_distributed_transaction_id(PG_FUNCTION_ARGS)
+{
+	PG_RETURN_INT64(GetNextDistributedTransactionId());
 }
 
 
@@ -374,17 +386,17 @@ UnSetDistributedTransactionId(void)
 
 
 /*
- * Will be used for testing. Uncomment once tests are added.
- *
- * static uint64
- * GetNextTransactionId()
- * {
- *  pg_atomic_uint64 transactionIdSequence =
- *      distributedTransactionShmemData->nextTransactionId;
- *  uint64 nextTransactionId = 0;
- *
- *  nextTransactionId = pg_atomic_fetch_add_u64(&transactionIdSequence, 1);
- *
- *  return nextTransactionId;
- * }
+ * GetNextDistributedTransactionId atomically fetches and returns
+ * the next distributed transaction id.
  */
+uint64
+GetNextDistributedTransactionId(void)
+{
+	pg_atomic_uint64 *transactionIdSequence =
+		&distributedTransactionShmemData->nextTransactionId;
+	uint64 nextTransactionId = 0;
+
+	nextTransactionId = pg_atomic_fetch_add_u64(transactionIdSequence, 1);
+
+	return nextTransactionId;
+}

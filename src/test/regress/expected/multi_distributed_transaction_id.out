@@ -108,6 +108,41 @@ FROM
       0 |  0 | Fri Dec 31 16:00:00 1999 PST
 (1 row)
 
+-- test get_next_distributed_transaction_id as well
+BEGIN;
+	SELECT assign_distributed_transaction_id(get_next_distributed_transaction_id(), 1, '2015-01-01 00:00:00+0');
+ assign_distributed_transaction_id 
+-----------------------------------
+ 
+(1 row)
+
+	SELECT 
+		nodeid, tx, time 
+	FROM 
+		get_distributed_transaction_id() AS f(databaseId oid, nodeId bigint, tx bigint, time timestamptz);
+ nodeid | tx |             time             
+--------+----+------------------------------
+      1 |  1 | Wed Dec 31 16:00:00 2014 PST
+(1 row)
+
+	
+	SELECT assign_distributed_transaction_id(get_next_distributed_transaction_id(), 2, '2016-01-01 00:00:00+0');
+ assign_distributed_transaction_id 
+-----------------------------------
+ 
+(1 row)
+
+	SELECT 
+		nodeid, tx, time 
+	FROM 
+		get_distributed_transaction_id() AS f(databaseId oid, nodeId bigint, tx bigint, time timestamptz);
+ nodeid | tx |             time             
+--------+----+------------------------------
+      2 |  2 | Thu Dec 31 16:00:00 2015 PST
+(1 row)
+
+	
+COMMIT;
 -- we should also see that a new connection means an uninitialized transaction ids
 BEGIN;
 	
