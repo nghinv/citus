@@ -340,7 +340,7 @@ ExecuteOptionalRemoteCommand(MultiConnection *connection, const char *command,
  * SendRemoteCommand is a PQsendQueryParams wrapper that logs remote commands, and
  * accepts a MultiConnection instead of a plain PGconn.  It makes sure it can
  * send commands asynchronously without blocking (at the potential expense of
- * an additional memory allocation). Note that since the function utilzes
+ * an additional memory allocation). Note that since the function utilizes
  * PQsendQueryParams() as the asynchronous command processing API, the command string
  * could only include a single command.
  */
@@ -376,7 +376,7 @@ SendRemoteCommandParams(MultiConnection *connection, const char *command,
  * SendRemoteCommand is a PQsendQuery wrapper that logs remote commands, and
  * accepts a MultiConnection instead of a plain PGconn.  It makes sure it can
  * send commands asynchronously without blocking (at the potential expense of
- * an additional memory allocation). Note that since the function utilzes
+ * an additional memory allocation). Note that since the function utilizes
  * PQsendQuery() as the asynchronous command processing API, the command string
  * could include multiple commands.
  */

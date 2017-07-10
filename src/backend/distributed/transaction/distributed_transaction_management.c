@@ -143,7 +143,9 @@ get_distributed_transaction_id(PG_FUNCTION_ARGS)
  * transactions on the shared memory.
  *
  * Note that the function could not gurantee a global consistent result, the function
- * only locks each active backend while copying it.
+ * only locks each active backend while copying it. Currently the only caller of this
+ * function is in the src/test folder. The consistency gurantee is sufficient for
+ * testing.
  */
 List *
 GetAllActiveDistributedTransactions(void)

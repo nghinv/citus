@@ -29,8 +29,8 @@ PG_FUNCTION_INFO_V1(print_all_active_distributed_transaction_ids);
 
 
 /*
- * prune_using_no_values returns the shards for the specified distributed table
- * after pruning using an empty clause list.
+ * print_all_active_distributed_transaction_ids prints all the
+ * active distributed transaction ids.
  */
 Datum
 print_all_active_distributed_transaction_ids(PG_FUNCTION_ARGS)
