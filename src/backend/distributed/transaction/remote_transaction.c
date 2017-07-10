@@ -17,6 +17,7 @@
 #include "access/xact.h"
 #include "distributed/connection_management.h"
 #include "distributed/coordinated_transaction_management.h"
+#include "distributed/distributed_transaction_management.h"
 #include "distributed/metadata_cache.h"
 #include "distributed/remote_commands.h"
 #include "distributed/remote_transaction.h"
@@ -32,12 +33,17 @@ static void WarnAboutLeakedPreparedTransaction(MultiConnection *connection, bool
 
 /*
  * StartRemoteTransactionBeging initiates beginning the remote transaction in
- * a non-blocking manner.
+ * a non-blocking manner. The function sends "BEGIN" followed by a function call
+ * (i.e., assign_distributed_transaction_id()) to assign the distributed transaction
+ * id on the remote node.
  */
 void
 StartRemoteTransactionBegin(struct MultiConnection *connection)
 {
 	RemoteTransaction *transaction = &connection->remoteTransaction;
+	char *beginCommand = "BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED";
+	StringInfo beginAndSetDistributedTransactionId = makeStringInfo();
+	DistributedTransactionId *distributedTransactionId = NULL;
 
 	Assert(transaction->transactionState == REMOTE_TRANS_INVALID);
 
@@ -46,13 +52,20 @@ StartRemoteTransactionBegin(struct MultiConnection *connection)
 
 	transaction->transactionState = REMOTE_TRANS_STARTING;
 
+	distributedTransactionId = GenerateNextDistributedTransactionId();
+
+	appendStringInfo(beginAndSetDistributedTransactionId,
+					 "%s; SELECT assign_distributed_transaction_id(%ld, %ld, '%s')",
+					 beginCommand, distributedTransactionId->initiatorNodeIdentifier,
+					 distributedTransactionId->transactionId,
+					 timestamptz_to_str(distributedTransactionId->timestamp));
+
 	/*
 	 * Explicitly specify READ COMMITTED, the default on the remote
 	 * side might have been changed, and that would cause problematic
 	 * behaviour.
 	 */
-	if (!SendRemoteCommand(connection,
-						   "BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED"))
+	if (!SendRemoteCommand(connection, beginAndSetDistributedTransactionId->data))
 	{
 		ReportConnectionError(connection, WARNING);
 		MarkRemoteTransactionFailed(connection, true);

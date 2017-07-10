@@ -122,7 +122,7 @@ BEGIN;
 		get_distributed_transaction_id() AS f(databaseId oid, nodeId bigint, tx bigint, time timestamptz);
  nodeid | tx |             time             
 --------+----+------------------------------
-      1 |  1 | Wed Dec 31 16:00:00 2014 PST
+   1153 |  1 | Wed Dec 31 16:00:00 2014 PST
 (1 row)
 
 	
@@ -138,7 +138,7 @@ BEGIN;
 		get_distributed_transaction_id() AS f(databaseId oid, nodeId bigint, tx bigint, time timestamptz);
  nodeid | tx |             time             
 --------+----+------------------------------
-      2 |  2 | Thu Dec 31 16:00:00 2015 PST
+   1154 |  2 | Thu Dec 31 16:00:00 2015 PST
 (1 row)
 
 	

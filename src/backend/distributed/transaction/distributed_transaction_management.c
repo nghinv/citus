@@ -27,24 +27,6 @@
 
 
 /*
- * Citus identifies a distributed transaction with a triplet consisting of
- *
- *  -  initiatorNodeIdentifier: A unique identifier of the node that initiated
- *     the distributed transaction
- *  -  transactionId: A locally unique identifier assigned for the distributed
- *     transaction on the node that initiated the distributed transaction
- *  -  timestamp: The current timestamp of distributed transaction initiation
- *
- */
-typedef struct DistributedTransactionId
-{
-	uint64 initiatorNodeIdentifier;
-	uint64 transactionId;
-	TimestampTz timestamp;
-} DistributedTransactionId;
-
-
-/*
  * Each backend's active distributed transaction information is tracked via
  * DistributedTransactionBackendData on the shared memory.
  */
@@ -387,8 +369,28 @@ UnSetDistributedTransactionId(void)
 
 
 /*
+ * GenerateNextDistributedTransactionId returns a new distributed transaction id with
+ * the current timestamp and next local transaction id.
+ */
+DistributedTransactionId *
+GenerateNextDistributedTransactionId(void)
+{
+	DistributedTransactionId *nextDistributedTransactionId =
+		(DistributedTransactionId *) palloc(sizeof(DistributedTransactionId));
+
+	nextDistributedTransactionId->initiatorNodeIdentifier = 0;
+	nextDistributedTransactionId->timestamp = GetCurrentTimestamp();
+	nextDistributedTransactionId->transactionId = GetNextDistributedTransactionId();
+
+	return nextDistributedTransactionId;
+}
+
+
+/*
  * GetNextDistributedTransactionId atomically fetches and returns
  * the next distributed transaction id.
+ *
+ * TODO: Name of this function should be changed.
  */
 static uint64
 GetNextDistributedTransactionId(void)
