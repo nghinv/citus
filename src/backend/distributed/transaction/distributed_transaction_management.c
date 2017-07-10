@@ -261,13 +261,14 @@ DistributedTransactionManagementShmemInit(void)
 		memset(distributedTransactionShmemData, 0,
 			   DistributedTransactionManagementShmemSize());
 
-		distributedTransactionShmemData->trancheId = LWLockNewTrancheId();
-
 #if (PG_VERSION_NUM >= 100000)
+		namedLockTranche->trancheId = LWLockNewTrancheId();
+
 		LWLockRegisterTranche(namedLockTranche->trancheId, trancheName);
 		LWLockInitialize(&distributedTransactionShmemData->lock,
 						 namedLockTranche->trancheId);
 #else
+		distributedTransactionShmemData->trancheId = LWLockNewTrancheId();
 
 		/* we only need a single lock */
 		lockTranche->array_base = &distributedTransactionShmemData->lock;
