@@ -28,17 +28,6 @@
 
 
 /*
- * Each backend's active distributed transaction information is tracked via
- * DistributedTransactionBackendData on the shared memory.
- */
-typedef struct DistributedTransactionBackendData
-{
-	Oid databaseId;
-	DistributedTransactionId transactionId;
-} DistributedTransactionBackendData;
-
-
-/*
  * Each backend's active distributed transaction data reside in the
  * shared memory on the DistributedTransactionShmemData.
  */
@@ -146,6 +135,49 @@ get_distributed_transaction_id(PG_FUNCTION_ARGS)
 											  transactionId, timestamp);
 
 	PG_RETURN_DATUM(distributedTransactionId);
+}
+
+
+/*
+ * GetAllActiveDistributedTransactions returns all the active distributed
+ * transactions on the shared memory.
+ *
+ * Note that the function could not gurantee a global consistent result, the function
+ * only locks each active backend while copying it.
+ */
+List *
+GetAllActiveDistributedTransactions(void)
+{
+	int sessionIndex = 0;
+	List *activeTransactionList = NIL;
+
+	for (sessionIndex = 0; sessionIndex < MaxBackends; ++sessionIndex)
+	{
+		DistributedTransactionBackendData *currentBackend =
+			&distributedTransactionShmemData->sessions[sessionIndex];
+
+		if (currentBackend && currentBackend->transactionId.transactionId != 0)
+		{
+			DistributedTransactionBackendData *activeBackend =
+				(DistributedTransactionBackendData *) palloc(sizeof(DistributedTransactionBackendData));
+
+			SpinLockAcquire(&BackendDistributedTransactionMutex);
+
+			activeBackend->databaseId = currentBackend->databaseId;
+			activeBackend->transactionId.initiatorNodeIdentifier =
+				currentBackend->transactionId.initiatorNodeIdentifier;
+			activeBackend->transactionId.transactionId =
+				currentBackend->transactionId.transactionId;
+			activeBackend->transactionId.timestamp =
+				currentBackend->transactionId.timestamp;
+
+			SpinLockRelease(&BackendDistributedTransactionMutex);
+
+			activeTransactionList = lappend(activeTransactionList, currentBackend);
+		}
+	}
+
+	return activeTransactionList;
 }
 
 

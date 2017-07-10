@@ -10,6 +10,10 @@
 #define DISTRIBUTED_TRANSACTION_MANAGEMENT_H_
 
 
+#include "datatype/timestamp.h"
+#include "nodes/pg_list.h"
+
+
 /*
  * Citus identifies a distributed transaction with a triplet consisting of
  *
@@ -28,6 +32,18 @@ typedef struct DistributedTransactionId
 } DistributedTransactionId;
 
 
+/*
+ * Each backend's active distributed transaction information is tracked via
+ * DistributedTransactionBackendData on the shared memory.
+ */
+typedef struct DistributedTransactionBackendData
+{
+	Oid databaseId;
+	DistributedTransactionId transactionId;
+} DistributedTransactionBackendData;
+
+
+extern List * GetAllActiveDistributedTransactions(void);
 extern void InitializeDistributedTransactionManagement(void);
 extern void InitializeDistributedTransactionManagementBackend(void);
 extern void UnSetDistributedTransactionId(void);
