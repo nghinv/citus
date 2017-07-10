@@ -378,9 +378,14 @@ GenerateNextDistributedTransactionId(void)
 	DistributedTransactionId *nextDistributedTransactionId =
 		(DistributedTransactionId *) palloc(sizeof(DistributedTransactionId));
 
-	nextDistributedTransactionId->initiatorNodeIdentifier = 0;
-	nextDistributedTransactionId->timestamp = GetCurrentTimestamp();
+	/*
+	 * FIXME: Once we allow running queries from secondaries, we should generate
+	 * an id which is unique to the node, not to the group as we do here.
+	 */
+	nextDistributedTransactionId->initiatorNodeIdentifier = GetLocalGroupId();
+
 	nextDistributedTransactionId->transactionId = GetNextDistributedTransactionId();
+	nextDistributedTransactionId->timestamp = GetCurrentTimestamp();
 
 	return nextDistributedTransactionId;
 }
