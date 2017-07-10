@@ -213,9 +213,14 @@ CoordinatedTransactionCallback(XactEvent event, void *arg)
 
 		case XACT_EVENT_PARALLEL_COMMIT:
 		case XACT_EVENT_PARALLEL_ABORT:
-		case XACT_EVENT_PREPARE:
 		{ }
 		  break;
+
+		case XACT_EVENT_PREPARE:
+		{
+			UnSetDistributedTransactionId();
+		}
+		break;
 
 		case XACT_EVENT_PRE_COMMIT:
 		{

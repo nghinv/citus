@@ -171,5 +171,35 @@ BEGIN;
       0 |  0 | Fri Dec 31 16:00:00 1999 PST
 (1 row)
 
+-- now show that PREPARE resets the distributed transaction id
+BEGIN;
+	SELECT assign_distributed_transaction_id(120, 120, '2015-01-01 00:00:00+0');
+ assign_distributed_transaction_id 
+-----------------------------------
+ 
+(1 row)
+
+	SELECT 
+		nodeid, tx, time 
+	FROM 
+		get_distributed_transaction_id() AS f(databaseId oid, nodeId bigint, tx bigint, time timestamptz);
+ nodeid | tx  |             time             
+--------+-----+------------------------------
+    120 | 120 | Wed Dec 31 16:00:00 2014 PST
+(1 row)
+
+	PREPARE TRANSACTION 'dist_xact_id_test';
+-- after the prepare we should see that transaction id is cleared
+SELECT 
+		nodeid, tx, time 
+	FROM 
+		get_distributed_transaction_id() AS f(databaseId oid, nodeId bigint, tx bigint, time timestamptz);
+ nodeid | tx |             time             
+--------+----+------------------------------
+      0 |  0 | Fri Dec 31 16:00:00 1999 PST
+(1 row)
+
+-- cleanup the transaction
+ROLLBACK PREPARED 'dist_xact_id_test';
 -- set back to the original zone
 SET TIME ZONE DEFAULT;
