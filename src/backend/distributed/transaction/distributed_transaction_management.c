@@ -2,7 +2,8 @@
  *
  * distributed_transaction_management.c
  *
- *   TODO: fill here
+ *  Infrastructure for distributed transaction management and distributed deadlock
+ *  detection.
  *
  * Copyright (c) 2017, Citus Data, Inc.
  *
@@ -38,16 +39,16 @@ typedef struct DistributedTransactionBackendData
 
 
 /*
- * All backends active distributed transaction data reside in the
+ * Each backend's active distributed transaction data reside in the
  * shared memory on the DistributedTransactionShmemData.
  */
 typedef struct DistributedTransactionShmemData
 {
 	int trancheId;
-#if (PG_VERSION_NUM < 100000)
-	LWLockTranche lockTranche;
-#else
+#if (PG_VERSION_NUM >= 100000)
 	NamedLWLockTranche namedLockTranche;
+#else
+	LWLockTranche lockTranche;
 #endif
 	LWLock lock;
 
@@ -69,7 +70,7 @@ static Datum GenerateDistributedTransactionIdTuple(Oid databaseId, uint64
 												   transactionId, TimestampTz timestamp);
 static TupleDesc GenerateDistributedTransactionTupleDesc(void);
 static size_t DistributedTransactionManagementShmemSize(void);
-static uint64 GetNextDistributedTransactionIdFromShmem(void);
+static uint64 GetNextLocalTransactionIdFromShmem(void);
 
 
 PG_FUNCTION_INFO_V1(assign_distributed_transaction_id);
@@ -110,7 +111,7 @@ assign_distributed_transaction_id(PG_FUNCTION_ARGS)
 
 /*
  * get_distributed_transaction_id returns a tuple with (databaseId, initiatorNodeIdentifier,
- * transactionId, timestamp) that exists in the shared memory.
+ * transactionId, timestamp) that exists in the shared memory associated with this backend.
  */
 Datum
 get_distributed_transaction_id(PG_FUNCTION_ARGS)
@@ -249,11 +250,11 @@ DistributedTransactionManagementShmemInit(void)
 
 	if (!alreadyInitialized)
 	{
-#if (PG_VERSION_NUM < 100000)
-		LWLockTranche *lockTranche = &distributedTransactionShmemData->lockTranche;
-#else
+#if (PG_VERSION_NUM >= 100000)
 		NamedLWLockTranche *namedLockTranche =
 			&distributedTransactionShmemData->namedLockTranche;
+#else
+		LWLockTranche *lockTranche = &distributedTransactionShmemData->lockTranche;
 #endif
 
 		/* start by zeroing out all the memory */
@@ -262,7 +263,11 @@ DistributedTransactionManagementShmemInit(void)
 
 		distributedTransactionShmemData->trancheId = LWLockNewTrancheId();
 
-#if (PG_VERSION_NUM < 100000)
+#if (PG_VERSION_NUM >= 100000)
+		LWLockRegisterTranche(namedLockTranche->trancheId, trancheName);
+		LWLockInitialize(&distributedTransactionShmemData->lock,
+						 namedLockTranche->trancheId);
+#else
 
 		/* we only need a single lock */
 		lockTranche->array_base = &distributedTransactionShmemData->lock;
@@ -272,10 +277,6 @@ DistributedTransactionManagementShmemInit(void)
 		LWLockRegisterTranche(distributedTransactionShmemData->trancheId, lockTranche);
 		LWLockInitialize(&distributedTransactionShmemData->lock,
 						 distributedTransactionShmemData->trancheId);
-#else
-		LWLockRegisterTranche(namedLockTranche->trancheId, trancheName);
-		LWLockInitialize(&distributedTransactionShmemData->lock,
-						 namedLockTranche->trancheId);
 #endif
 
 		/* start the distributed transaction ids from 1 */
@@ -370,9 +371,9 @@ GenerateNextDistributedTransactionId(void)
 	 * FIXME: Once we allow running queries from secondaries, we should generate
 	 * an id which is unique to the node, not to the group as we do here.
 	 */
-	nextDistributedTransactionId->initiatorNodeIdentifier = GetLocalGroupId();
+	nextDistributedTransactionId->initiatorNodeIdentifier = (uint64) GetLocalGroupId();
 
-	nextDistributedTransactionId->transactionId = GetNextDistributedTransactionIdFromShmem();
+	nextDistributedTransactionId->transactionId = GetNextLocalTransactionIdFromShmem();
 	nextDistributedTransactionId->timestamp = GetCurrentTimestamp();
 
 	return nextDistributedTransactionId;
@@ -380,11 +381,11 @@ GenerateNextDistributedTransactionId(void)
 
 
 /*
- * GetNextDistributedTransactionIdFromShmem atomically fetches and returns
+ * GetNextLocalTransactionIdFromShmem atomically fetches and returns
  * the next distributed transaction id from the shared memory.
  */
 static uint64
-GetNextDistributedTransactionIdFromShmem(void)
+GetNextLocalTransactionIdFromShmem(void)
 {
 	pg_atomic_uint64 *transactionIdSequence =
 		&distributedTransactionShmemData->nextTransactionId;

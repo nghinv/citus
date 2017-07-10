@@ -52,8 +52,12 @@ StartRemoteTransactionBegin(struct MultiConnection *connection)
 
 	transaction->transactionState = REMOTE_TRANS_STARTING;
 
+	/*
+	 * Append BEGIN and assign_distributed_transaction_id() statements into a single command
+	 * and send both in one step. The reason is purely performance, we don't want
+	 * seperate roundtrips for these two statements.
+	 */
 	distributedTransactionId = GenerateNextDistributedTransactionId();
-
 	appendStringInfo(beginAndSetDistributedTransactionId,
 					 "%s; SELECT assign_distributed_transaction_id(%ld, %ld, '%s')",
 					 beginCommand, distributedTransactionId->initiatorNodeIdentifier,
