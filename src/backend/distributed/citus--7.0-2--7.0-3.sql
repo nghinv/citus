@@ -16,11 +16,4 @@ CREATE OR REPLACE FUNCTION get_distributed_transaction_id()
  COMMENT ON FUNCTION get_distributed_transaction_id()
      IS 'gets the current distributed transaction id';
 
-CREATE OR REPLACE FUNCTION get_next_distributed_transaction_id()
-     RETURNS int8
-     LANGUAGE C STRICT
-     AS 'citus',$$get_next_distributed_transaction_id$$;
- COMMENT ON FUNCTION get_next_distributed_transaction_id()
-     IS 'gets the next distributed transaction id';
-
 RESET search_path;

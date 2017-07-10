@@ -69,12 +69,11 @@ static Datum GenerateDistributedTransactionIdTuple(Oid databaseId, uint64
 												   transactionId, TimestampTz timestamp);
 static TupleDesc GenerateDistributedTransactionTupleDesc(void);
 static size_t DistributedTransactionManagementShmemSize(void);
-static uint64 GetNextDistributedTransactionId(void);
+static uint64 GetNextDistributedTransactionIdFromShmem(void);
 
 
 PG_FUNCTION_INFO_V1(assign_distributed_transaction_id);
 PG_FUNCTION_INFO_V1(get_distributed_transaction_id);
-PG_FUNCTION_INFO_V1(get_next_distributed_transaction_id); /* only for test purposes */
 
 
 /*
@@ -146,17 +145,6 @@ get_distributed_transaction_id(PG_FUNCTION_ARGS)
 											  transactionId, timestamp);
 
 	PG_RETURN_DATUM(distributedTransactionId);
-}
-
-
-/*
- * Should only be used for testing.
- * Wrapper around GetNextDistributedTransactionId()
- */
-Datum
-get_next_distributed_transaction_id(PG_FUNCTION_ARGS)
-{
-	PG_RETURN_INT64(GetNextDistributedTransactionId());
 }
 
 
@@ -384,7 +372,7 @@ GenerateNextDistributedTransactionId(void)
 	 */
 	nextDistributedTransactionId->initiatorNodeIdentifier = GetLocalGroupId();
 
-	nextDistributedTransactionId->transactionId = GetNextDistributedTransactionId();
+	nextDistributedTransactionId->transactionId = GetNextDistributedTransactionIdFromShmem();
 	nextDistributedTransactionId->timestamp = GetCurrentTimestamp();
 
 	return nextDistributedTransactionId;
@@ -392,13 +380,11 @@ GenerateNextDistributedTransactionId(void)
 
 
 /*
- * GetNextDistributedTransactionId atomically fetches and returns
- * the next distributed transaction id.
- *
- * TODO: Name of this function should be changed.
+ * GetNextDistributedTransactionIdFromShmem atomically fetches and returns
+ * the next distributed transaction id from the shared memory.
  */
 static uint64
-GetNextDistributedTransactionId(void)
+GetNextDistributedTransactionIdFromShmem(void)
 {
 	pg_atomic_uint64 *transactionIdSequence =
 		&distributedTransactionShmemData->nextTransactionId;
