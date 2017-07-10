@@ -87,6 +87,7 @@ static Datum GenerateDistributedTransactionIdTuple(Oid databaseId, uint64
 												   transactionId, TimestampTz timestamp);
 static TupleDesc GenerateDistributedTransactionTupleDesc(void);
 static size_t DistributedTransactionManagementShmemSize(void);
+static uint64 GetNextDistributedTransactionId(void);
 
 
 PG_FUNCTION_INFO_V1(assign_distributed_transaction_id);
@@ -389,7 +390,7 @@ UnSetDistributedTransactionId(void)
  * GetNextDistributedTransactionId atomically fetches and returns
  * the next distributed transaction id.
  */
-uint64
+static uint64
 GetNextDistributedTransactionId(void)
 {
 	pg_atomic_uint64 *transactionIdSequence =
