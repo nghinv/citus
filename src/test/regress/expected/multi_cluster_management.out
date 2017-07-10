@@ -29,9 +29,9 @@ SELECT master_get_active_worker_nodes();
 
 -- try to add a node that is already in the cluster
 SELECT * FROM master_add_node('localhost', :worker_1_port);
- nodeid | groupid | nodename  | nodeport | noderack | hasmetadata | isactive 
---------+---------+-----------+----------+----------+-------------+----------
-      1 |       1 | localhost |    57637 | default  | f           | t
+ nodeid | groupid | nodename  | nodeport | noderack | hasmetadata | isactive | noderole 
+--------+---------+-----------+----------+----------+-------------+----------+----------
+      1 |       1 | localhost |    57637 | default  | f           | t        | primary
 (1 row)
 
 -- get the active nodes
@@ -77,9 +77,9 @@ SELECT master_get_active_worker_nodes();
 
 -- add some shard placements to the cluster
 SELECT master_activate_node('localhost', :worker_2_port);
-       master_activate_node        
------------------------------------
- (3,3,localhost,57638,default,f,t)
+           master_activate_node            
+-------------------------------------------
+ (3,3,localhost,57638,default,f,t,primary)
 (1 row)
 
 CREATE TABLE cluster_management_test (col_1 text, col_2 int);
@@ -138,9 +138,9 @@ SELECT master_get_active_worker_nodes();
 
 -- restore the node for next tests
 SELECT master_activate_node('localhost', :worker_2_port);
-       master_activate_node        
------------------------------------
- (3,3,localhost,57638,default,f,t)
+           master_activate_node            
+-------------------------------------------
+ (3,3,localhost,57638,default,f,t,primary)
 (1 row)
 
 -- try to remove a node with active placements and see that node removal is failed
@@ -241,24 +241,24 @@ SELECT
 (1 row)
 
 SELECT * FROM pg_dist_node ORDER BY nodeid;
- nodeid | groupid | nodename | nodeport | noderack | hasmetadata | isactive 
---------+---------+----------+----------+----------+-------------+----------
+ nodeid | groupid | nodename | nodeport | noderack | hasmetadata | isactive | noderole 
+--------+---------+----------+----------+----------+-------------+----------+----------
 (0 rows)
 
 -- check that adding two nodes in the same transaction works
 SELECT
 	master_add_node('localhost', :worker_1_port),
 	master_add_node('localhost', :worker_2_port);
-          master_add_node          |          master_add_node          
------------------------------------+-----------------------------------
- (6,6,localhost,57637,default,f,t) | (7,7,localhost,57638,default,f,t)
+              master_add_node              |              master_add_node              
+-------------------------------------------+-------------------------------------------
+ (6,6,localhost,57637,default,f,t,primary) | (7,7,localhost,57638,default,f,t,primary)
 (1 row)
 
 SELECT * FROM pg_dist_node ORDER BY nodeid;
- nodeid | groupid | nodename  | nodeport | noderack | hasmetadata | isactive 
---------+---------+-----------+----------+----------+-------------+----------
-      6 |       6 | localhost |    57637 | default  | f           | t
-      7 |       7 | localhost |    57638 | default  | f           | t
+ nodeid | groupid | nodename  | nodeport | noderack | hasmetadata | isactive | noderole 
+--------+---------+-----------+----------+----------+-------------+----------+----------
+      6 |       6 | localhost |    57637 | default  | f           | t        | primary
+      7 |       7 | localhost |    57638 | default  | f           | t        | primary
 (2 rows)
 
 -- check that mixed add/remove node commands work fine inside transaction

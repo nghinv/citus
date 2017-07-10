@@ -88,7 +88,7 @@ master_add_node(PG_FUNCTION_ARGS)
 	int32 nodePort = PG_GETARG_INT32(1);
 	char *nodeNameString = text_to_cstring(nodeName);
 	int32 groupId = PG_GETARG_INT32(2);
-	Oid nodeRole = PG_GETARG_OID(3);
+	Oid nodeRole = InvalidOid;
 	char *nodeRack = WORKER_DEFAULT_RACK;
 	bool hasMetadata = false;
 	bool isActive = false;
@@ -96,6 +96,16 @@ master_add_node(PG_FUNCTION_ARGS)
 	Datum nodeRecord;
 
 	CheckCitusVersion(ERROR);
+
+	/* during tests this function is called before nodeRole has been created */
+	if (PG_NARGS() == 3)
+	{
+		nodeRole = InvalidOid;
+	}
+	else
+	{
+		nodeRole = PG_GETARG_OID(3);
+	}
 
 	nodeRecord = AddNodeMetadata(nodeNameString, nodePort, groupId, nodeRack,
 								 hasMetadata, isActive, nodeRole, &nodeAlreadyExists);
@@ -249,23 +259,32 @@ GroupForNode(char *nodeName, int nodePort)
 
 
 /*
- * NodeForGroup returns the (unique) node which is in this group.
- * In a future where we have nodeRole this will return the primary node.
+ * PrimaryNodeForGroup returns the (unique) primary in the specified group.
+ *
+ * If there are any nodes in the requested group and groupContainsNodes is not NULL
+ * it will set the bool groupContainsNodes references to true.
  */
 WorkerNode *
-NodeForGroup(uint32 groupId)
+PrimaryNodeForGroup(uint32 groupId, bool *groupContainsNodes)
 {
 	WorkerNode *workerNode = NULL;
 	HASH_SEQ_STATUS status;
 	HTAB *workerNodeHash = GetWorkerNodeHash();
+	Oid primaryRole = PrimaryNodeRoleId();
 
 	hash_seq_init(&status, workerNodeHash);
 
 	while ((workerNode = hash_seq_search(&status)) != NULL)
 	{
 		uint32 workerNodeGroupId = workerNode->groupId;
+		Oid workerNodeRole = workerNode->nodeRole;
 
-		if (workerNodeGroupId == groupId)
+		if (groupContainsNodes != NULL && workerNodeGroupId == groupId)
+		{
+			*groupContainsNodes = true;
+		}
+
+		if (workerNodeGroupId == groupId && workerNodeRole == primaryRole)
 		{
 			hash_seq_term(&status);
 			return workerNode;
@@ -585,6 +604,7 @@ AddNodeMetadata(char *nodeName, int32 nodePort, int32 groupId, char *nodeRack,
 	char *nodeDeleteCommand = NULL;
 	char *nodeInsertCommand = NULL;
 	List *workerNodeList = NIL;
+	Oid primaryRole;
 
 	EnsureCoordinator();
 	EnsureSuperUser();
@@ -624,6 +644,21 @@ AddNodeMetadata(char *nodeName, int32 nodePort, int32 groupId, char *nodeRack,
 		}
 	}
 
+	/* if nodeRole hasn't been added yet there's a constraint for one-node-per-group */
+	if (nodeRole != InvalidOid)
+	{
+		primaryRole = PrimaryNodeRoleId();
+		if (nodeRole == primaryRole)
+		{
+			WorkerNode *existingPrimaryNode = PrimaryNodeForGroup(groupId, NULL);
+
+			if (existingPrimaryNode != NULL)
+			{
+				ereport(ERROR, (errmsg("group %d already has a primary node", groupId)));
+			}
+		}
+	}
+
 	/* generate the new node id from the sequence */
 	nextNodeIdInt = GetNextNodeId();
 
@@ -641,10 +676,8 @@ AddNodeMetadata(char *nodeName, int32 nodePort, int32 groupId, char *nodeRack,
 	nodeInsertCommand = NodeListInsertCommand(workerNodeList);
 	SendCommandToWorkers(WORKERS_WITH_METADATA, nodeInsertCommand);
 
-	heap_close(pgDistNode, AccessExclusiveLock);
+	heap_close(pgDistNode, NoLock);
 
-	/* fetch the worker node, and generate the output */
-	workerNode = FindWorkerNode(nodeName, nodePort);
 	returnData = GenerateNodeTuple(workerNode);
 
 	return returnData;
@@ -935,7 +968,7 @@ InsertNodeRow(int nodeid, char *nodeName, int32 nodePort, uint32 groupId, char *
 	CatalogTupleInsert(pgDistNode, heapTuple);
 
 	/* close relation and invalidate previous cache entry */
-	heap_close(pgDistNode, AccessExclusiveLock);
+	heap_close(pgDistNode, NoLock);
 
 	CitusInvalidateRelcacheByRelid(DistNodeRelationId());
 

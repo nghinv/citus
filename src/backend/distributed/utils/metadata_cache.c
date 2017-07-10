@@ -110,6 +110,9 @@ typedef struct MetadataCacheData
 	Oid extraDataContainerFuncId;
 	Oid workerHashFunctionId;
 	Oid extensionOwner;
+	Oid primaryNodeRoleId;
+	Oid secondaryNodeRoleId;
+	Oid unavailableNodeRoleId;
 } MetadataCacheData;
 
 
@@ -404,16 +407,24 @@ ResolveGroupShardPlacement(GroupShardPlacement *groupShardPlacement,
 	DistTableCacheEntry *tableEntry = shardEntry->tableEntry;
 	int shardIndex = shardEntry->shardIndex;
 	ShardInterval *shardInterval = tableEntry->sortedShardIntervalArray[shardIndex];
+	bool groupContainsNodes;
 
 	ShardPlacement *shardPlacement = CitusMakeNode(ShardPlacement);
 	uint32 groupId = groupShardPlacement->groupId;
-	WorkerNode *workerNode = NodeForGroup(groupId);
+	WorkerNode *workerNode = PrimaryNodeForGroup(groupId, &groupContainsNodes);
 
-	if (workerNode == NULL)
+	if (workerNode == NULL && !groupContainsNodes)
 	{
 		ereport(ERROR, (errmsg("the metadata is inconsistent"),
 						errdetail("there is a placement in group %u but "
 								  "there are no nodes in that group", groupId)));
+	}
+
+	if (workerNode == NULL && groupContainsNodes)
+	{
+		ereport(ERROR, (errmsg("group %u does not have a primary node", groupId),
+						errdetail("the primary node may be in the process of "
+								  "failing over")));
 	}
 
 	/* copy everything into shardPlacement but preserve the header */
@@ -1812,13 +1823,66 @@ CitusExtensionOwnerName(void)
 }
 
 
-/* return the  username of the currently active role */
+/* return the username of the currently active role */
 char *
 CurrentUserName(void)
 {
 	Oid userId = GetUserId();
 
 	return GetUserNameFromId(userId, false);
+}
+
+
+static Oid
+LookupNodeRoleValueId(char *valueName)
+{
+	Oid nodeRoleTypId = TypenameGetTypid("noderole");
+	Datum nodeRoleIdDatum = ObjectIdGetDatum(nodeRoleTypId);
+
+	Datum valueDatum = CStringGetDatum(valueName);
+
+	Datum valueIdDatum = DirectFunctionCall2(enum_in, valueDatum, nodeRoleIdDatum);
+	Oid valueId = DatumGetObjectId(valueIdDatum);
+	return valueId;
+}
+
+
+/* return the Oid of the 'primary' nodeRole enum value */
+Oid
+PrimaryNodeRoleId(void)
+{
+	if (!MetadataCache.primaryNodeRoleId)
+	{
+		MetadataCache.primaryNodeRoleId = LookupNodeRoleValueId("primary");
+	}
+
+	return MetadataCache.primaryNodeRoleId;
+}
+
+
+/* return the Oid of the 'secodary' nodeRole enum value */
+Oid
+SecondaryNodeRoleId(void)
+{
+	if (!MetadataCache.secondaryNodeRoleId)
+	{
+		MetadataCache.secondaryNodeRoleId = LookupNodeRoleValueId("secondary");
+	}
+
+	return MetadataCache.secondaryNodeRoleId;
+}
+
+
+/* return the Oid of the 'unavailable' nodeRole enum value */
+Oid
+UnavailableNodeRoleId(void)
+{
+	if (!MetadataCache.unavailableNodeRoleId)
+	{
+		MetadataCache.unavailableNodeRoleId = LookupNodeRoleValueId("unavailable");
+	}
+
+	return MetadataCache.unavailableNodeRoleId;
 }
 
 
