@@ -47,9 +47,9 @@ print_all_active_distributed_transaction_ids(PG_FUNCTION_ARGS)
 			(DistributedTransactionBackendData *) lfirst(activeTransactionCell);
 
 		elog(INFO, "(%d, %ld, %ld, '%s')", backendData->databaseId,
-				   backendData->transactionId.initiatorNodeIdentifier,
-				   backendData->transactionId.transactionId,
-				   timestamptz_to_str(backendData->transactionId.timestamp));
+			 backendData->transactionId.initiatorNodeIdentifier,
+			 backendData->transactionId.transactionId,
+			 timestamptz_to_str(backendData->transactionId.timestamp));
 	}
 
 	PG_RETURN_VOID();

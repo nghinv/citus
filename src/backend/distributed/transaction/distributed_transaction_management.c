@@ -159,7 +159,8 @@ GetAllActiveDistributedTransactions(void)
 		if (currentBackend && currentBackend->transactionId.transactionId != 0)
 		{
 			DistributedTransactionBackendData *activeBackend =
-				(DistributedTransactionBackendData *) palloc(sizeof(DistributedTransactionBackendData));
+				(DistributedTransactionBackendData *) palloc(
+					sizeof(DistributedTransactionBackendData));
 
 			SpinLockAcquire(&BackendDistributedTransactionMutex);
 
