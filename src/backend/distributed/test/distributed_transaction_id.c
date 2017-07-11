@@ -49,16 +49,13 @@ get_all_active_distributed_transaction_ids(PG_FUNCTION_ARGS)
 		/* switch context when allocating stuff to be used in later calls */
 		oldcontext = MemoryContextSwitchTo(functionContext->multi_call_memory_ctx);
 
-
 		activeTransactionList = GetAllActiveDistributedTransactions();
 		activeTransactionList = SortList(activeTransactionList,
 										 CompareDistributedTransactionIds);
 
-
 		activeTransactionCell = list_head(activeTransactionList);
 
 		functionContext->user_fctx = activeTransactionCell;
-
 
 		/* return to original context when allocating transient memory */
 		MemoryContextSwitchTo(oldcontext);
@@ -72,17 +69,16 @@ get_all_active_distributed_transaction_ids(PG_FUNCTION_ARGS)
 		DistributedTransactionBackendData *backendData =
 			(DistributedTransactionBackendData *) lfirst(activeTransactionCell);
 
-		Datum datumVal = GenerateDistributedTransactionIdTuple(backendData->databaseId,
-															   backendData->transactionId.
-															   initiatorNodeIdentifier,
-															   backendData->transactionId.
-															   transactionId,
-															   backendData->transactionId.
-															   timestamp);
+		Datum backendDataDatum =
+			GenerateDistributedTransactionIdTuple(backendData->databaseId,
+												  backendData->transactionId.
+												  initiatorNodeIdentifier,
+												  backendData->transactionId.transactionId,
+												  backendData->transactionId.timestamp);
 
 		functionContext->user_fctx = lnext(activeTransactionCell);
 
-		SRF_RETURN_NEXT(functionContext, datumVal);
+		SRF_RETURN_NEXT(functionContext, backendDataDatum);
 	}
 	else
 	{

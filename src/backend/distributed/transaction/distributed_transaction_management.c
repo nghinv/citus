@@ -107,7 +107,8 @@ assign_distributed_transaction_id(PG_FUNCTION_ARGS)
 Datum
 get_distributed_transaction_id(PG_FUNCTION_ARGS)
 {
-	Datum distributedTransactionId = 0;
+	Datum distributedTransactionIdDatum = 0;
+	DistributedTransactionId *distributedTransctionId = NULL;
 
 	Oid databaseId = InvalidOid;
 	uint64 initiatorNodeIdentifier = 0;
@@ -122,22 +123,18 @@ get_distributed_transaction_id(PG_FUNCTION_ARGS)
 		ereport(ERROR, (errmsg("backend is not ready for distributed transactions")));
 	}
 
-	/* read the shmem while mutex is held */
-	SpinLockAcquire(&MyDistributedTransactionBackend->mutex);
+	distributedTransctionId = GetCurrentDistributedTransctionId();
 
-	databaseId = MyDistributedTransactionBackend->databaseId;
-	initiatorNodeIdentifier =
-		MyDistributedTransactionBackend->transactionId.initiatorNodeIdentifier;
-	transactionId = MyDistributedTransactionBackend->transactionId.transactionId;
-	timestamp = MyDistributedTransactionBackend->transactionId.timestamp;
+	databaseId = MyDatabaseId;
+	initiatorNodeIdentifier = distributedTransctionId->initiatorNodeIdentifier;
+	transactionId = distributedTransctionId->transactionId;
+	timestamp = distributedTransctionId->timestamp;
 
-	SpinLockRelease(&MyDistributedTransactionBackend->mutex);
-
-	distributedTransactionId =
+	distributedTransactionIdDatum =
 		GenerateDistributedTransactionIdTuple(databaseId, initiatorNodeIdentifier,
 											  transactionId, timestamp);
 
-	PG_RETURN_DATUM(distributedTransactionId);
+	PG_RETURN_DATUM(distributedTransactionIdDatum);
 }
 
 
