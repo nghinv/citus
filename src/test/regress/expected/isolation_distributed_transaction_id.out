@@ -1,6 +1,6 @@
 Parsed test spec with 4 sessions
 
-starting permutation: s1-begin s1-assign-transaction-id s4-print-all-transactions s2-begin s2-assign-transaction-id s4-print-all-transactions s3-begin s3-assign-transaction-id s4-print-all-transactions s1-commit s4-print-all-transactions s2-commit s4-print-all-transactions s3-commit s4-print-all-transactions
+starting permutation: s1-begin s1-assign-transaction-id s4-get-all-transactions s2-begin s2-assign-transaction-id s4-get-all-transactions s3-begin s3-assign-transaction-id s4-get-all-transactions s1-commit s4-get-all-transactions s2-commit s4-get-all-transactions s3-commit s4-get-all-transactions
 step s1-begin: 
     BEGIN;
 
@@ -10,13 +10,12 @@ step s1-assign-transaction-id:
 assign_distributed_transaction_id
 
                
-INFO:  (16384, 1, 1, '2014-12-31 16:00:00-08')
-step s4-print-all-transactions: 
-	SELECT print_all_active_distributed_transaction_ids();
+step s4-get-all-transactions: 
+	SELECT get_all_active_distributed_transaction_ids();
 
-print_all_active_distributed_transaction_ids
+get_all_active_distributed_transaction_ids
 
-               
+(16384,1,1,"Wed Dec 31 16:00:00 2014 PST")
 step s2-begin: 
     BEGIN;
 
@@ -26,14 +25,13 @@ step s2-assign-transaction-id:
 assign_distributed_transaction_id
 
                
-INFO:  (16384, 1, 1, '2014-12-31 16:00:00-08')
-INFO:  (16384, 2, 2, '2015-01-01 16:00:00-08')
-step s4-print-all-transactions: 
-	SELECT print_all_active_distributed_transaction_ids();
+step s4-get-all-transactions: 
+	SELECT get_all_active_distributed_transaction_ids();
 
-print_all_active_distributed_transaction_ids
+get_all_active_distributed_transaction_ids
 
-               
+(16384,1,1,"Wed Dec 31 16:00:00 2014 PST")
+(16384,2,2,"Thu Jan 01 16:00:00 2015 PST")
 step s3-begin: 
     BEGIN;
 
@@ -43,42 +41,38 @@ step s3-assign-transaction-id:
 assign_distributed_transaction_id
 
                
-INFO:  (16384, 1, 1, '2014-12-31 16:00:00-08')
-INFO:  (16384, 2, 2, '2015-01-01 16:00:00-08')
-INFO:  (16384, 3, 3, '2015-01-02 16:00:00-08')
-step s4-print-all-transactions: 
-	SELECT print_all_active_distributed_transaction_ids();
+step s4-get-all-transactions: 
+	SELECT get_all_active_distributed_transaction_ids();
 
-print_all_active_distributed_transaction_ids
+get_all_active_distributed_transaction_ids
 
-               
+(16384,1,1,"Wed Dec 31 16:00:00 2014 PST")
+(16384,2,2,"Thu Jan 01 16:00:00 2015 PST")
+(16384,3,3,"Fri Jan 02 16:00:00 2015 PST")
 step s1-commit: 
     COMMIT;
 
-INFO:  (16384, 2, 2, '2015-01-01 16:00:00-08')
-INFO:  (16384, 3, 3, '2015-01-02 16:00:00-08')
-step s4-print-all-transactions: 
-	SELECT print_all_active_distributed_transaction_ids();
+step s4-get-all-transactions: 
+	SELECT get_all_active_distributed_transaction_ids();
 
-print_all_active_distributed_transaction_ids
+get_all_active_distributed_transaction_ids
 
-               
+(16384,2,2,"Thu Jan 01 16:00:00 2015 PST")
+(16384,3,3,"Fri Jan 02 16:00:00 2015 PST")
 step s2-commit: 
     COMMIT;
 
-INFO:  (16384, 3, 3, '2015-01-02 16:00:00-08')
-step s4-print-all-transactions: 
-	SELECT print_all_active_distributed_transaction_ids();
+step s4-get-all-transactions: 
+	SELECT get_all_active_distributed_transaction_ids();
 
-print_all_active_distributed_transaction_ids
+get_all_active_distributed_transaction_ids
 
-               
+(16384,3,3,"Fri Jan 02 16:00:00 2015 PST")
 step s3-commit: 
     COMMIT;
 
-step s4-print-all-transactions: 
-	SELECT print_all_active_distributed_transaction_ids();
+step s4-get-all-transactions: 
+	SELECT get_all_active_distributed_transaction_ids();
 
-print_all_active_distributed_transaction_ids
+get_all_active_distributed_transaction_ids
 
-               

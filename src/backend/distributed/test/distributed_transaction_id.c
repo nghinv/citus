@@ -12,6 +12,7 @@
 #include "postgres.h"
 #include "c.h"
 #include "fmgr.h"
+#include "funcapi.h"
 
 #include "catalog/pg_type.h"
 #include "distributed/distributed_transaction_management.h"
@@ -25,34 +26,68 @@ static int CompareDistributedTransactionIds(const void *leftElement,
 											const void *rightElement);
 
 
-PG_FUNCTION_INFO_V1(print_all_active_distributed_transaction_ids);
+PG_FUNCTION_INFO_V1(get_all_active_distributed_transaction_ids);
 
 
 /*
- * print_all_active_distributed_transaction_ids prints all the
+ * get_all_active_distributed_transaction_ids returns all the
  * active distributed transaction ids.
  */
 Datum
-print_all_active_distributed_transaction_ids(PG_FUNCTION_ARGS)
+get_all_active_distributed_transaction_ids(PG_FUNCTION_ARGS)
 {
-	List *activeTransactions = GetAllActiveDistributedTransactions();
+	FuncCallContext *functionContext;
+
+	MemoryContext oldcontext;
+	List *activeTransactionList = NULL;
 	ListCell *activeTransactionCell = NULL;
 
-	/* sort for consistent outputs */
-	activeTransactions = SortList(activeTransactions, CompareDistributedTransactionIds);
+	if (SRF_IS_FIRSTCALL())
+	{
+		functionContext = SRF_FIRSTCALL_INIT();
 
-	foreach(activeTransactionCell, activeTransactions)
+		/* switch context when allocating stuff to be used in later calls */
+		oldcontext = MemoryContextSwitchTo(functionContext->multi_call_memory_ctx);
+
+
+		activeTransactionList = GetAllActiveDistributedTransactions();
+		activeTransactionList = SortList(activeTransactionList,
+										 CompareDistributedTransactionIds);
+
+
+		activeTransactionCell = list_head(activeTransactionList);
+
+		functionContext->user_fctx = activeTransactionCell;
+
+
+		/* return to original context when allocating transient memory */
+		MemoryContextSwitchTo(oldcontext);
+	}
+
+	functionContext = SRF_PERCALL_SETUP();
+
+	activeTransactionCell = (ListCell *) functionContext->user_fctx;
+	if (activeTransactionCell != NULL)
 	{
 		DistributedTransactionBackendData *backendData =
 			(DistributedTransactionBackendData *) lfirst(activeTransactionCell);
 
-		elog(INFO, "(%d, %ld, %ld, '%s')", backendData->databaseId,
-			 backendData->transactionId.initiatorNodeIdentifier,
-			 backendData->transactionId.transactionId,
-			 timestamptz_to_str(backendData->transactionId.timestamp));
-	}
+		Datum datumVal = GenerateDistributedTransactionIdTuple(backendData->databaseId,
+															   backendData->transactionId.
+															   initiatorNodeIdentifier,
+															   backendData->transactionId.
+															   transactionId,
+															   backendData->transactionId.
+															   timestamp);
 
-	PG_RETURN_VOID();
+		functionContext->user_fctx = lnext(activeTransactionCell);
+
+		SRF_RETURN_NEXT(functionContext, datumVal);
+	}
+	else
+	{
+		SRF_RETURN_DONE(functionContext);
+	}
 }
 
 

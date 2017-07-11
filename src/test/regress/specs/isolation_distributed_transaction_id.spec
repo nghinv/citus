@@ -4,19 +4,17 @@
 
 setup
 {
-	CREATE OR REPLACE FUNCTION print_all_active_distributed_transaction_ids()
-	RETURNS void
+	CREATE OR REPLACE FUNCTION get_all_active_distributed_transaction_ids()
+	RETURNS setof record
 	LANGUAGE C STRICT
-	AS 'citus',$$print_all_active_distributed_transaction_ids$$;
- 	COMMENT ON FUNCTION print_all_active_distributed_transaction_ids()
-	IS 'prints all the distributed transaction ids';
+	AS 'citus', $$get_all_active_distributed_transaction_ids$$;
 
 	SET TIME ZONE 'PST8PDT';
 }
 
 teardown
 {
-    DROP FUNCTION print_all_active_distributed_transaction_ids();
+    DROP FUNCTION get_all_active_distributed_transaction_ids();
 	SET TIME ZONE DEFAULT;
 }
 
@@ -74,13 +72,13 @@ step "s3-commit"
 
 session "s4"
 
-step "s4-print-all-transactions"
+step "s4-get-all-transactions"
 {
-	SELECT print_all_active_distributed_transaction_ids();
+	SELECT get_all_active_distributed_transaction_ids();
 }
 
 # show that we could get all distributed transaction ids from seperate sessions
-permutation "s1-begin" "s1-assign-transaction-id" "s4-print-all-transactions" "s2-begin" "s2-assign-transaction-id" "s4-print-all-transactions" "s3-begin" "s3-assign-transaction-id" "s4-print-all-transactions" "s1-commit" "s4-print-all-transactions" "s2-commit" "s4-print-all-transactions" "s3-commit" "s4-print-all-transactions"   
+permutation "s1-begin" "s1-assign-transaction-id" "s4-get-all-transactions" "s2-begin" "s2-assign-transaction-id" "s4-get-all-transactions" "s3-begin" "s3-assign-transaction-id" "s4-get-all-transactions" "s1-commit" "s4-get-all-transactions" "s2-commit" "s4-get-all-transactions" "s3-commit" "s4-get-all-transactions"
 
 
 

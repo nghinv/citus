@@ -58,9 +58,6 @@ static DistributedTransactionBackendData *MyDistributedTransactionBackend = NULL
 
 
 static void DistributedTransactionManagementShmemInit(void);
-static Datum GenerateDistributedTransactionIdTuple(Oid databaseId, uint64
-												   initiatorNodeIdentifier, uint64
-												   transactionId, TimestampTz timestamp);
 static TupleDesc GenerateDistributedTransactionTupleDesc(void);
 static size_t DistributedTransactionManagementShmemSize(void);
 static DistributedTransactionId * GenerateNextDistributedTransactionId(void);
@@ -194,7 +191,7 @@ GetAllActiveDistributedTransactions(void)
  * GenerateDistributedTransactionIdTuple returns a datum of pseudo-generated heaptuple
  * for the distributed transaction id provided by the parameters.
  */
-static Datum
+Datum
 GenerateDistributedTransactionIdTuple(Oid databaseId, uint64 initiatorNodeIdentifier,
 									  uint64 transactionId, TimestampTz timestamp)
 {

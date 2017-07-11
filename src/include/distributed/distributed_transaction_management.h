@@ -46,6 +46,9 @@ typedef struct DistributedTransactionBackendData
 
 
 extern List * GetAllActiveDistributedTransactions(void);
+extern Datum GenerateDistributedTransactionIdTuple(Oid databaseId, uint64
+												   initiatorNodeIdentifier, uint64
+												   transactionId, TimestampTz timestamp);
 extern void InitializeDistributedTransactionManagement(void);
 extern void InitializeDistributedTransactionManagementBackend(void);
 extern void UnSetDistributedTransactionId(void);
