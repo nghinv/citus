@@ -41,6 +41,11 @@ typedef struct DistributedTransactionShmemData
 #endif
 	LWLock lock;
 
+	/*
+	 * We prefer to use an atomic integer over sequences for two
+	 * reasons (i) orders of magnitude performance difference
+	 * (ii) allowing read-only replicas to be able to generate ids
+	 */
 	pg_atomic_uint64 nextTransactionId;
 
 	DistributedTransactionBackendData sessions[FLEXIBLE_ARRAY_MEMBER];
