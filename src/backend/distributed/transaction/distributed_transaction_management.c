@@ -114,9 +114,10 @@ get_distributed_transaction_id(PG_FUNCTION_ARGS)
 
 	CheckCitusVersion(ERROR);
 
+	/* MyDistributedTransactionBackend should always be avaliable, just out of paranoia */
 	if (!MyDistributedTransactionBackend)
 	{
-		InitializeDistributedTransactionManagementBackend();
+		ereport(ERROR, (errmsg("backend is not ready for distributed transactions")));
 	}
 
 	/* read the shmem while mutex is held */
