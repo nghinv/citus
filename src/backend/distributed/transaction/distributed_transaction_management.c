@@ -186,7 +186,7 @@ GetAllActiveDistributedTransactions(void)
 
 
 /*
- * GenerateDistributedTransactionIdTuple returns a datum of psudo-generated heaptuple
+ * GenerateDistributedTransactionIdTuple returns a datum of pseudo-generated heaptuple
  * for the distributed transaction id provided by the parameters.
  */
 static Datum
@@ -219,7 +219,7 @@ GenerateDistributedTransactionIdTuple(Oid databaseId, uint64 initiatorNodeIdenti
 
 
 /*
- * GenerateDistributedTransactionTupleDesc returns a psudo tuple descriptor
+ * GenerateDistributedTransactionTupleDesc returns a tuple descriptor
  * for distributed transaction id in the form of (databaseId,
  * initiatorNodeIdentifier, transactionId, timestamp).
  */
