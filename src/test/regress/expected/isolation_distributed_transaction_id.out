@@ -76,3 +76,48 @@ step s4-get-all-transactions:
 
 get_all_active_distributed_transaction_ids
 
+
+starting permutation: s1-create-table-and-function s1-begin s1-insert s1-get-current-transaction-id s2-get-first-worker-active-transactions
+step s1-create-table-and-function: 
+	-- some tests also use distributed table
+	CREATE TABLE distributed_transaction_id_table(some_value int, other_value int);
+	SET citus.shard_count TO 4;
+	SELECT create_distributed_table('distributed_transaction_id_table', 'some_value');
+
+	SELECT run_command_on_workers($f$
+	CREATE OR REPLACE FUNCTION get_all_active_distributed_transaction_ids()
+	RETURNS setof record
+	LANGUAGE C STRICT
+	AS 'citus', $$get_all_active_distributed_transaction_ids$$;
+	$f$);
+
+create_distributed_table
+
+               
+run_command_on_workers
+
+(localhost,57637,t,"CREATE FUNCTION")
+(localhost,57638,t,"CREATE FUNCTION")
+step s1-begin: 
+    BEGIN;
+
+step s1-insert: 
+	INSERT INTO distributed_transaction_id_table VALUES (1, 1);
+
+step s1-get-current-transaction-id: 
+	SELECT row(nodeid, tx) FROM  get_distributed_transaction_id() AS f(databaseId oid, nodeId bigint, tx bigint, time timestamptz);
+
+row            
+
+(0,148)        
+step s2-get-first-worker-active-transactions: 
+		SELECT * FROM run_command_on_workers('SELECT row(nodeid, tx)
+												FROM	 
+											  get_all_active_distributed_transaction_ids() AS f(databaseId oid, nodeId bigint, tx bigint, time timestamptz)
+											') 
+		WHERE nodeport = 57637;
+;
+
+nodename       nodeport       success        result         
+
+localhost      57637          t              (0,148)        

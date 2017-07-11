@@ -167,7 +167,7 @@ GetAllActiveDistributedTransactions(void)
 				(DistributedTransactionBackendData *) palloc(
 					sizeof(DistributedTransactionBackendData));
 
-			SpinLockAcquire(&MyDistributedTransactionBackend->mutex);
+			SpinLockAcquire(&currentBackend->mutex);
 
 			activeBackend->databaseId = currentBackend->databaseId;
 			activeBackend->transactionId.initiatorNodeIdentifier =
@@ -177,9 +177,9 @@ GetAllActiveDistributedTransactions(void)
 			activeBackend->transactionId.timestamp =
 				currentBackend->transactionId.timestamp;
 
-			SpinLockRelease(&MyDistributedTransactionBackend->mutex);
+			SpinLockRelease(&currentBackend->mutex);
 
-			activeTransactionList = lappend(activeTransactionList, currentBackend);
+			activeTransactionList = lappend(activeTransactionList, activeBackend);
 		}
 	}
 
