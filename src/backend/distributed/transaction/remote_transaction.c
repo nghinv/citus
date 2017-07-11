@@ -41,7 +41,7 @@ void
 StartRemoteTransactionBegin(struct MultiConnection *connection)
 {
 	RemoteTransaction *transaction = &connection->remoteTransaction;
-	char *beginCommand = "BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED";
+	char *beginCommand = NULL;
 	StringInfo beginAndSetDistributedTransactionId = makeStringInfo();
 	DistributedTransactionId *distributedTransactionId = NULL;
 
@@ -53,22 +53,27 @@ StartRemoteTransactionBegin(struct MultiConnection *connection)
 	transaction->transactionState = REMOTE_TRANS_STARTING;
 
 	/*
-	 * Append BEGIN and assign_distributed_transaction_id() statements into a single command
-	 * and send both in one step. The reason is purely performance, we don't want
-	 * seperate roundtrips for these two statements.
-	 */
-	distributedTransactionId = GenerateNextDistributedTransactionId();
-	appendStringInfo(beginAndSetDistributedTransactionId,
-					 "%s; SELECT assign_distributed_transaction_id(%ld, %ld, '%s')",
-					 beginCommand, distributedTransactionId->initiatorNodeIdentifier,
-					 distributedTransactionId->transactionId,
-					 timestamptz_to_str(distributedTransactionId->timestamp));
-
-	/*
 	 * Explicitly specify READ COMMITTED, the default on the remote
 	 * side might have been changed, and that would cause problematic
 	 * behaviour.
 	 */
+	beginCommand = "BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED";
+
+	/*
+	 * Append BEGIN and assign_distributed_transaction_id() statements into a single command
+	 * and send both in one step. The reason is purely performance, we don't want
+	 * seperate roundtrips for these two statements.
+	 */
+	appendStringInfo(beginAndSetDistributedTransactionId, "%s;", beginCommand);
+
+	distributedTransactionId = GenerateNextDistributedTransactionId();
+	appendStringInfo(beginAndSetDistributedTransactionId,
+					 "SELECT assign_distributed_transaction_id(%ld, %ld, '%s')",
+					 distributedTransactionId->initiatorNodeIdentifier,
+					 distributedTransactionId->transactionId,
+					 timestamptz_to_str(distributedTransactionId->timestamp));
+
+
 	if (!SendRemoteCommand(connection, beginAndSetDistributedTransactionId->data))
 	{
 		ReportConnectionError(connection, WARNING);
