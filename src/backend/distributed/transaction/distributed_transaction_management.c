@@ -49,7 +49,7 @@ typedef struct DistributedTransactionShmemData
 
 static shmem_startup_hook_type prev_shmem_startup_hook = NULL;
 static DistributedTransactionShmemData *distributedTransactionShmemData = NULL;
-static DistributedTransactionBackendData *DistributedTransactionBackend = NULL;
+static DistributedTransactionBackendData *MyDistributedTransactionBackend = NULL;
 slock_t BackendDistributedTransactionMutex = '\0';
 
 
@@ -78,19 +78,19 @@ assign_distributed_transaction_id(PG_FUNCTION_ARGS)
 	CheckCitusVersion(ERROR);
 
 	/* TODO: Is assert OK? */
-	if (!DistributedTransactionBackend)
+	if (!MyDistributedTransactionBackend)
 	{
 		InitializeDistributedTransactionManagementBackend();
 	}
 
 	SpinLockAcquire(&BackendDistributedTransactionMutex);
 
-	DistributedTransactionBackend->databaseId = MyDatabaseId;
+	MyDistributedTransactionBackend->databaseId = MyDatabaseId;
 
-	DistributedTransactionBackend->transactionId.initiatorNodeIdentifier =
+	MyDistributedTransactionBackend->transactionId.initiatorNodeIdentifier =
 		PG_GETARG_INT64(0);
-	DistributedTransactionBackend->transactionId.transactionId = PG_GETARG_INT64(1);
-	DistributedTransactionBackend->transactionId.timestamp = PG_GETARG_TIMESTAMPTZ(2);
+	MyDistributedTransactionBackend->transactionId.transactionId = PG_GETARG_INT64(1);
+	MyDistributedTransactionBackend->transactionId.timestamp = PG_GETARG_TIMESTAMPTZ(2);
 
 	SpinLockRelease(&BackendDistributedTransactionMutex);
 
@@ -114,7 +114,7 @@ get_distributed_transaction_id(PG_FUNCTION_ARGS)
 
 	CheckCitusVersion(ERROR);
 
-	if (!DistributedTransactionBackend)
+	if (!MyDistributedTransactionBackend)
 	{
 		InitializeDistributedTransactionManagementBackend();
 	}
@@ -122,11 +122,11 @@ get_distributed_transaction_id(PG_FUNCTION_ARGS)
 	/* read the shmem while mutex is held */
 	SpinLockAcquire(&BackendDistributedTransactionMutex);
 
-	databaseId = DistributedTransactionBackend->databaseId;
+	databaseId = MyDistributedTransactionBackend->databaseId;
 	initiatorNodeIdentifier =
-		DistributedTransactionBackend->transactionId.initiatorNodeIdentifier;
-	transactionId = DistributedTransactionBackend->transactionId.transactionId;
-	timestamp = DistributedTransactionBackend->transactionId.timestamp;
+		MyDistributedTransactionBackend->transactionId.initiatorNodeIdentifier;
+	transactionId = MyDistributedTransactionBackend->transactionId.transactionId;
+	timestamp = MyDistributedTransactionBackend->transactionId.timestamp;
 
 	SpinLockRelease(&BackendDistributedTransactionMutex);
 
@@ -354,15 +354,15 @@ InitializeDistributedTransactionManagementBackend(void)
 {
 	LWLockAcquire(&distributedTransactionShmemData->lock, LW_EXCLUSIVE);
 
-	DistributedTransactionBackend =
+	MyDistributedTransactionBackend =
 		&distributedTransactionShmemData->sessions[MyProc->pgprocno];
 
-	Assert(DistributedTransactionBackend);
+	Assert(MyDistributedTransactionBackend);
 
-	DistributedTransactionBackend->databaseId = 0;
-	DistributedTransactionBackend->transactionId.initiatorNodeIdentifier = 0;
-	DistributedTransactionBackend->transactionId.transactionId = 0;
-	DistributedTransactionBackend->transactionId.timestamp = 0;
+	MyDistributedTransactionBackend->databaseId = 0;
+	MyDistributedTransactionBackend->transactionId.initiatorNodeIdentifier = 0;
+	MyDistributedTransactionBackend->transactionId.transactionId = 0;
+	MyDistributedTransactionBackend->transactionId.timestamp = 0;
 
 	/* we'll use mutex while accessing the backend shmem */
 	SpinLockInit(&BackendDistributedTransactionMutex);
@@ -379,14 +379,14 @@ InitializeDistributedTransactionManagementBackend(void)
 void
 UnSetDistributedTransactionId(void)
 {
-	if (DistributedTransactionBackend)
+	if (MyDistributedTransactionBackend)
 	{
 		SpinLockAcquire(&BackendDistributedTransactionMutex);
 
-		DistributedTransactionBackend->databaseId = 0;
-		DistributedTransactionBackend->transactionId.initiatorNodeIdentifier = 0;
-		DistributedTransactionBackend->transactionId.transactionId = 0;
-		DistributedTransactionBackend->transactionId.timestamp = 0;
+		MyDistributedTransactionBackend->databaseId = 0;
+		MyDistributedTransactionBackend->transactionId.initiatorNodeIdentifier = 0;
+		MyDistributedTransactionBackend->transactionId.transactionId = 0;
+		MyDistributedTransactionBackend->transactionId.timestamp = 0;
 
 		SpinLockRelease(&BackendDistributedTransactionMutex);
 	}
