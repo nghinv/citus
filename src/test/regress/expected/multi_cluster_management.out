@@ -405,3 +405,44 @@ SELECT stop_metadata_sync_to_node('localhost', :worker_2_port);
  
 (1 row)
 
+-- check that you can't add more than one node to a group
+SELECT groupid FROM master_add_node('localhost', 9999, noderole => 'primary') \gset
+SELECT master_add_node('localhost', 9998, nodegroup => :groupid, noderole => 'primary');
+ERROR:  group 14 already has a primary node
+-- check that you can add secondaries and unavailable nodes to a group
+SELECT master_add_node('localhost', 9998, nodegroup => :groupid, noderole => 'secondary');
+               master_add_node                
+----------------------------------------------
+ (15,14,localhost,9998,default,f,t,secondary)
+(1 row)
+
+SELECT master_add_node('localhost', 9997, nodegroup => :groupid, noderole => 'unavailable');
+                master_add_node                 
+------------------------------------------------
+ (16,14,localhost,9997,default,f,t,unavailable)
+(1 row)
+
+SELECT master_add_node('localhost', 9996, nodegroup => :groupid, noderole => 'secondary');
+               master_add_node                
+----------------------------------------------
+ (17,14,localhost,9996,default,f,t,secondary)
+(1 row)
+
+SELECT master_remove_node('localhost', 9999);
+ master_remove_node 
+--------------------
+ 
+(1 row)
+
+SELECT master_remove_node('localhost', 9998);
+ master_remove_node 
+--------------------
+ 
+(1 row)
+
+SELECT master_remove_node('localhost', 9997);
+ master_remove_node 
+--------------------
+ 
+(1 row)
+

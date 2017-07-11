@@ -162,3 +162,14 @@ DELETE FROM pg_dist_node;
 \c - - - :master_port
 SELECT stop_metadata_sync_to_node('localhost', :worker_1_port);
 SELECT stop_metadata_sync_to_node('localhost', :worker_2_port);
+
+-- check that you can't add more than one node to a group
+SELECT groupid FROM master_add_node('localhost', 9999, noderole => 'primary') \gset
+SELECT master_add_node('localhost', 9998, nodegroup => :groupid, noderole => 'primary');
+-- check that you can add secondaries and unavailable nodes to a group
+SELECT master_add_node('localhost', 9998, nodegroup => :groupid, noderole => 'secondary');
+SELECT master_add_node('localhost', 9997, nodegroup => :groupid, noderole => 'unavailable');
+SELECT master_add_node('localhost', 9996, nodegroup => :groupid, noderole => 'secondary');
+SELECT master_remove_node('localhost', 9999);
+SELECT master_remove_node('localhost', 9998);
+SELECT master_remove_node('localhost', 9997);
