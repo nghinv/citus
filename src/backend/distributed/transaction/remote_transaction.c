@@ -66,7 +66,7 @@ StartRemoteTransactionBegin(struct MultiConnection *connection)
 	 */
 	appendStringInfo(beginAndSetDistributedTransactionId, "%s;", beginCommand);
 
-	distributedTransactionId = GenerateNextDistributedTransactionId();
+	distributedTransactionId = GetCurrentDistributedTransctionId();
 	appendStringInfo(beginAndSetDistributedTransactionId,
 					 "SELECT assign_distributed_transaction_id(%ld, %ld, '%s')",
 					 distributedTransactionId->initiatorNodeIdentifier,

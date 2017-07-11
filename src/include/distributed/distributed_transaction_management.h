@@ -49,6 +49,7 @@ extern List * GetAllActiveDistributedTransactions(void);
 extern void InitializeDistributedTransactionManagement(void);
 extern void InitializeDistributedTransactionManagementBackend(void);
 extern void UnSetDistributedTransactionId(void);
-extern DistributedTransactionId * GenerateNextDistributedTransactionId(void);
+extern DistributedTransactionId * GetCurrentDistributedTransctionId(void);
+extern void GenerateAndSetNextDistributedTransactionId(void);
 
 #endif /* DISTRIBUTED_TRANSACTION_MANAGEMENT_H_ */

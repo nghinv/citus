@@ -63,6 +63,7 @@ static Datum GenerateDistributedTransactionIdTuple(Oid databaseId, uint64
 												   transactionId, TimestampTz timestamp);
 static TupleDesc GenerateDistributedTransactionTupleDesc(void);
 static size_t DistributedTransactionManagementShmemSize(void);
+static DistributedTransactionId * GenerateNextDistributedTransactionId(void);
 static uint64 GetNextLocalTransactionIdFromShmem(void);
 
 
@@ -399,10 +400,63 @@ UnSetDistributedTransactionId(void)
 
 
 /*
+ * GetCurrentDistributedTransctionId reads the backend's distributed transaction id and
+ * returns a copy of it.
+ */
+DistributedTransactionId *
+GetCurrentDistributedTransctionId(void)
+{
+	DistributedTransactionId *currentDistributedTransactionId =
+		(DistributedTransactionId *) palloc(sizeof(DistributedTransactionId));
+
+	SpinLockAcquire(&MyDistributedTransactionBackend->mutex);
+
+	currentDistributedTransactionId->initiatorNodeIdentifier =
+		MyDistributedTransactionBackend->transactionId.initiatorNodeIdentifier;
+	currentDistributedTransactionId->transactionId =
+		MyDistributedTransactionBackend->transactionId.transactionId;
+	currentDistributedTransactionId->timestamp =
+		MyDistributedTransactionBackend->transactionId.timestamp;
+
+	SpinLockRelease(&MyDistributedTransactionBackend->mutex);
+
+	return currentDistributedTransactionId;
+}
+
+
+/*
+ * GenerateAndSetNextDistributedTransactionId generates a new distributed transaction
+ * id and sets it for the current backend.
+ *
+ * This function should only be called on BeginCoordinatedTransaction(). Any other
+ * callers is very likely to break the distributed transction management.
+ */
+void
+GenerateAndSetNextDistributedTransactionId(void)
+{
+	DistributedTransactionId *distributedTransactionId =
+		GenerateNextDistributedTransactionId();
+
+	SpinLockAcquire(&MyDistributedTransactionBackend->mutex);
+
+	MyDistributedTransactionBackend->databaseId = MyDatabaseId;
+
+	MyDistributedTransactionBackend->transactionId.initiatorNodeIdentifier =
+		distributedTransactionId->initiatorNodeIdentifier;
+	MyDistributedTransactionBackend->transactionId.transactionId =
+		distributedTransactionId->transactionId;
+	MyDistributedTransactionBackend->transactionId.timestamp =
+		distributedTransactionId->timestamp;
+
+	SpinLockRelease(&MyDistributedTransactionBackend->mutex);
+}
+
+
+/*
  * GenerateNextDistributedTransactionId returns a new distributed transaction id with
  * the current timestamp and next local transaction id.
  */
-DistributedTransactionId *
+static DistributedTransactionId *
 GenerateNextDistributedTransactionId(void)
 {
 	DistributedTransactionId *nextDistributedTransactionId =

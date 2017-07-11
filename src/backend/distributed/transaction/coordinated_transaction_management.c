@@ -74,6 +74,9 @@ BeginCoordinatedTransaction(void)
 	}
 
 	CurrentCoordinatedTransactionState = COORD_TRANS_STARTED;
+
+	/* this is crucial for managing distributed transaction ids */
+	GenerateAndSetNextDistributedTransactionId();
 }
 
 
