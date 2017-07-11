@@ -426,9 +426,6 @@ GetNextLocalTransactionIdFromShmem(void)
 {
 	pg_atomic_uint64 *transactionIdSequence =
 		&distributedTransactionShmemData->nextTransactionId;
-	uint64 nextTransactionId = 0;
 
-	nextTransactionId = pg_atomic_fetch_add_u64(transactionIdSequence, 1);
-
-	return nextTransactionId;
+	return pg_atomic_fetch_add_u64(transactionIdSequence, 1);
 }
