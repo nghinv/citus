@@ -12,6 +12,7 @@
 
 #include "datatype/timestamp.h"
 #include "nodes/pg_list.h"
+#include "storage/s_lock.h"
 
 
 /*
@@ -39,6 +40,7 @@ typedef struct DistributedTransactionId
 typedef struct DistributedTransactionBackendData
 {
 	Oid databaseId;
+	slock_t mutex;
 	DistributedTransactionId transactionId;
 } DistributedTransactionBackendData;
 
