@@ -27,33 +27,9 @@
 #include "utils/timestamp.h"
 
 
-/*
- * Each backend's active distributed transaction data reside in the
- * shared memory on the DistributedTransactionShmemData.
- */
-typedef struct DistributedTransactionShmemData
-{
-	int trancheId;
-#if (PG_VERSION_NUM >= 100000)
-	NamedLWLockTranche namedLockTranche;
-#else
-	LWLockTranche lockTranche;
-#endif
-	LWLock lock;
-
-	/*
-	 * We prefer to use an atomic integer over sequences for two
-	 * reasons (i) orders of magnitude performance difference
-	 * (ii) allowing read-only replicas to be able to generate ids
-	 */
-	pg_atomic_uint64 nextTransactionId;
-
-	DistributedTransactionBackendData sessions[FLEXIBLE_ARRAY_MEMBER];
-} DistributedTransactionShmemData;
 
 
 static shmem_startup_hook_type prev_shmem_startup_hook = NULL;
-static DistributedTransactionShmemData *distributedTransactionShmemData = NULL;
 static DistributedTransactionBackendData *MyDistributedTransactionBackend = NULL;
 
 
@@ -66,6 +42,13 @@ static uint64 GetNextLocalTransactionIdFromShmem(void);
 
 PG_FUNCTION_INFO_V1(assign_distributed_transaction_id);
 PG_FUNCTION_INFO_V1(get_distributed_transaction_id);
+static DistributedTransactionShmemData *distributedTransactionShmemData = NULL;
+
+DistributedTransactionShmemData *
+GetShmem(void)
+{
+	return distributedTransactionShmemData;
+}
 
 
 /*
