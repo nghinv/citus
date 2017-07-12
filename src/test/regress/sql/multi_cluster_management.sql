@@ -163,13 +163,13 @@ DELETE FROM pg_dist_node;
 SELECT stop_metadata_sync_to_node('localhost', :worker_1_port);
 SELECT stop_metadata_sync_to_node('localhost', :worker_2_port);
 
--- check that you can't add more than one node to a group
-SELECT groupid FROM master_add_node('localhost', 9999, noderole => 'primary') \gset
-SELECT master_add_node('localhost', 9998, nodegroup => :groupid, noderole => 'primary');
+-- check that you can't add more than one primary to a group
+SELECT groupid AS worker_1_group FROM pg_dist_node WHERE nodeport = :worker_1_port \gset
+SELECT master_add_node('localhost', 9999, nodegroup => :worker_1_group, noderole => 'primary');
 -- check that you can add secondaries and unavailable nodes to a group
-SELECT master_add_node('localhost', 9998, nodegroup => :groupid, noderole => 'secondary');
-SELECT master_add_node('localhost', 9997, nodegroup => :groupid, noderole => 'unavailable');
-SELECT master_add_node('localhost', 9996, nodegroup => :groupid, noderole => 'secondary');
-SELECT master_remove_node('localhost', 9999);
-SELECT master_remove_node('localhost', 9998);
-SELECT master_remove_node('localhost', 9997);
+SELECT groupid AS worker_2_group FROM pg_dist_node WHERE nodeport = :worker_2_port \gset
+SELECT master_add_node('localhost', 9998, nodegroup => :worker_1_group, noderole => 'secondary');
+SELECT master_add_node('localhost', 9997, nodegroup => :worker_1_group, noderole => 'unavailable');
+SELECT master_add_node('localhost', 9996, nodegroup => :worker_2_group, noderole => 'secondary');
+-- don't remove the secondary and unavailable nodes, check that no commands are sent to
+-- them in any of the remaining tests

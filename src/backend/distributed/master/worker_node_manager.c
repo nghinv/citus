@@ -307,7 +307,7 @@ WorkerGetNodeWithName(const char *hostname)
 uint32
 WorkerGetLiveNodeCount(void)
 {
-	List *workerNodeList = ActiveWorkerNodeList();
+	List *workerNodeList = ActivePrimaryNodeList();
 	uint32 liveWorkerCount = list_length(workerNodeList);
 
 	return liveWorkerCount;
@@ -315,22 +315,25 @@ WorkerGetLiveNodeCount(void)
 
 
 /*
- * ActiveWorkerNodeList iterates over the hash table that includes the worker
- * nodes and adds active nodes to a list, which is returned.
+ * ActivePrimaryNodeList returns a list of all the active primary nodes in workerNodeHash
  */
 List *
-ActiveWorkerNodeList(void)
+ActivePrimaryNodeList(void)
 {
 	List *workerNodeList = NIL;
 	WorkerNode *workerNode = NULL;
 	HTAB *workerNodeHash = GetWorkerNodeHash();
+	Oid primaryRole = PrimaryNodeRoleId();
 	HASH_SEQ_STATUS status;
 
 	hash_seq_init(&status, workerNodeHash);
 
 	while ((workerNode = hash_seq_search(&status)) != NULL)
 	{
-		if (workerNode->isActive)
+		/* if nodeRole does not yet exist all nodes are primary nodes */
+		bool roleMatchesOrDoesNotExist =
+			(primaryRole == InvalidOid || workerNode->nodeRole == primaryRole);
+		if (workerNode->isActive && roleMatchesOrDoesNotExist)
 		{
 			WorkerNode *workerNodeCopy = palloc0(sizeof(WorkerNode));
 			memcpy(workerNodeCopy, workerNode, sizeof(WorkerNode));

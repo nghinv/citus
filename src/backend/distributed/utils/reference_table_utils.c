@@ -127,7 +127,7 @@ ReplicateAllReferenceTablesToNode(char *nodeName, int nodePort)
 {
 	List *referenceTableList = ReferenceTableOidList();
 	ListCell *referenceTableCell = NULL;
-	List *workerNodeList = ActiveWorkerNodeList();
+	List *workerNodeList = ActivePrimaryNodeList();
 	uint32 workerCount = 0;
 	Oid firstReferenceTableId = InvalidOid;
 	uint32 referenceTableColocationId = INVALID_COLOCATION_ID;
@@ -228,7 +228,7 @@ ReplicateShardToAllWorkers(ShardInterval *shardInterval)
 {
 	/* we do not use pgDistNode, we only obtain a lock on it to prevent modifications */
 	Relation pgDistNode = heap_open(DistNodeRelationId(), AccessShareLock);
-	List *workerNodeList = ActiveWorkerNodeList();
+	List *workerNodeList = ActivePrimaryNodeList();
 	ListCell *workerNodeCell = NULL;
 
 	/*
@@ -364,7 +364,7 @@ uint32
 CreateReferenceTableColocationId()
 {
 	uint32 colocationId = INVALID_COLOCATION_ID;
-	List *workerNodeList = ActiveWorkerNodeList();
+	List *workerNodeList = ActivePrimaryNodeList();
 	int shardCount = 1;
 	int replicationFactor = list_length(workerNodeList);
 	Oid distributionColumnType = InvalidOid;

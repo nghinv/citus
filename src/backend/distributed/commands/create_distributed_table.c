@@ -245,7 +245,7 @@ CreateReferenceTable(Oid relationId)
 	EnsureCoordinator();
 	CheckCitusVersion(ERROR);
 
-	workerNodeList = ActiveWorkerNodeList();
+	workerNodeList = ActivePrimaryNodeList();
 	replicationFactor = list_length(workerNodeList);
 
 	/* if there are no workers, error out */

@@ -1833,17 +1833,26 @@ CurrentUserName(void)
 }
 
 
+/* returns InvalidOid if the noderole enum doesn't exist yet */
 static Oid
 LookupNodeRoleValueId(char *valueName)
 {
 	Oid nodeRoleTypId = TypenameGetTypid("noderole");
-	Datum nodeRoleIdDatum = ObjectIdGetDatum(nodeRoleTypId);
 
-	Datum valueDatum = CStringGetDatum(valueName);
+	if (nodeRoleTypId == InvalidOid)
+	{
+		return InvalidOid;
+	}
+	else
+	{
+		Datum nodeRoleIdDatum = ObjectIdGetDatum(nodeRoleTypId);
+		Datum valueDatum = CStringGetDatum(valueName);
 
-	Datum valueIdDatum = DirectFunctionCall2(enum_in, valueDatum, nodeRoleIdDatum);
-	Oid valueId = DatumGetObjectId(valueIdDatum);
-	return valueId;
+		Datum valueIdDatum = DirectFunctionCall2(enum_in, valueDatum, nodeRoleIdDatum);
+
+		Oid valueId = DatumGetObjectId(valueIdDatum);
+		return valueId;
+	}
 }
 
 

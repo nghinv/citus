@@ -569,7 +569,7 @@ RemoveNodeFromCluster(char *nodeName, int32 nodePort)
 		Oid firstReferenceTableId = linitial_oid(referenceTableList);
 		uint32 referenceTableColocationId = TableColocationId(firstReferenceTableId);
 
-		List *workerNodeList = ActiveWorkerNodeList();
+		List *workerNodeList = ActivePrimaryNodeList();
 		int workerCount = list_length(workerNodeList);
 
 		UpdateColocationGroupReplicationFactor(referenceTableColocationId, workerCount);

@@ -4791,7 +4791,7 @@ GreedyAssignTaskList(List *taskList)
 	uint32 taskCount = list_length(taskList);
 
 	/* get the worker node list and sort the list */
-	List *workerNodeList = ActiveWorkerNodeList();
+	List *workerNodeList = ActivePrimaryNodeList();
 	workerNodeList = SortList(workerNodeList, CompareWorkerNodes);
 
 	/*
@@ -5223,7 +5223,7 @@ AssignDualHashTaskList(List *taskList)
 	 * if subsequent jobs have a small number of tasks, we won't allocate the
 	 * tasks to the same worker repeatedly.
 	 */
-	List *workerNodeList = ActiveWorkerNodeList();
+	List *workerNodeList = ActivePrimaryNodeList();
 	uint32 workerNodeCount = (uint32) list_length(workerNodeList);
 	uint32 beginningNodeIndex = jobId % workerNodeCount;
 
