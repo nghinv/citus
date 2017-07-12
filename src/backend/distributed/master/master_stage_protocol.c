@@ -71,7 +71,6 @@ master_create_empty_shard(PG_FUNCTION_ARGS)
 {
 	text *relationNameText = PG_GETARG_TEXT_P(0);
 	char *relationName = text_to_cstring(relationNameText);
-	List *workerNodeList = NIL;
 	uint64 shardId = INVALID_SHARD_ID;
 	List *ddlEventList = NULL;
 	uint32 attemptableNodeCount = 0;
@@ -91,8 +90,6 @@ master_create_empty_shard(PG_FUNCTION_ARGS)
 	bool includeSequenceDefaults = false;
 
 	CheckCitusVersion(ERROR);
-
-	workerNodeList = ActiveWorkerNodeList();
 
 	EnsureTablePermissions(relationId, ACL_INSERT);
 	CheckDistributedTable(relationId);
@@ -162,6 +159,7 @@ master_create_empty_shard(PG_FUNCTION_ARGS)
 		}
 		else if (ShardPlacementPolicy == SHARD_PLACEMENT_ROUND_ROBIN)
 		{
+			List *workerNodeList = ActiveWorkerNodeList();
 			candidateNode = WorkerGetRoundRobinCandidateNode(workerNodeList, shardId,
 															 candidateNodeIndex);
 		}
