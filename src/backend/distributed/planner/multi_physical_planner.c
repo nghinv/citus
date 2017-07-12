@@ -1863,10 +1863,10 @@ BuildMapMergeJob(Query *jobQuery, List *dependedJobList, Var *partitionKey,
 static uint32
 HashPartitionCount(void)
 {
-	uint32 nodeCount = WorkerGetLiveNodeCount();
+	uint32 groupCount = WorkerGetLiveGroupCount();
 	double maxReduceTasksPerNode = MaxRunningTasksPerNode / 2.0;
 
-	uint32 partitionCount = (uint32) rint(nodeCount * maxReduceTasksPerNode);
+	uint32 partitionCount = (uint32) rint(groupCount * maxReduceTasksPerNode);
 	return partitionCount;
 }
 

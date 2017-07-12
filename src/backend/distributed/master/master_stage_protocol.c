@@ -74,7 +74,6 @@ master_create_empty_shard(PG_FUNCTION_ARGS)
 	uint64 shardId = INVALID_SHARD_ID;
 	List *ddlEventList = NULL;
 	uint32 attemptableNodeCount = 0;
-	uint32 liveNodeCount = 0;
 
 	uint32 candidateNodeIndex = 0;
 	List *candidateNodeList = NIL;
@@ -140,12 +139,15 @@ master_create_empty_shard(PG_FUNCTION_ARGS)
 	/* get table DDL commands to replay on the worker node */
 	ddlEventList = GetTableDDLEvents(relationId, includeSequenceDefaults);
 
-	/* if enough live nodes, add an extra candidate node as backup */
-	attemptableNodeCount = ShardReplicationFactor;
-	liveNodeCount = WorkerGetLiveNodeCount();
-	if (liveNodeCount > ShardReplicationFactor)
+	/* if enough live groups, add an extra candidate node as backup */
 	{
-		attemptableNodeCount = ShardReplicationFactor + 1;
+		uint32 liveGroupCount = WorkerGetLiveGroupCount();
+
+		attemptableNodeCount = ShardReplicationFactor;
+		if (liveGroupCount > ShardReplicationFactor)
+		{
+			attemptableNodeCount = ShardReplicationFactor + 1;
+		}
 	}
 
 	/* first retrieve a list of random nodes for shard placements */

@@ -77,8 +77,8 @@ WorkerGetRandomCandidateNode(List *currentNodeList)
 	 * scan over the worker node hash for determining the number of live nodes.
 	 */
 	uint32 currentNodeCount = list_length(currentNodeList);
-	uint32 liveNodeCount = WorkerGetLiveNodeCount();
-	if (currentNodeCount >= liveNodeCount)
+	uint32 liveGroupCount = WorkerGetLiveGroupCount();
+	if (currentNodeCount >= liveGroupCount)
 	{
 		return NULL;
 	}
@@ -302,10 +302,10 @@ WorkerGetNodeWithName(const char *hostname)
 
 
 /*
- * WorkerGetLiveNodeCount returns the number of live nodes in the cluster.
- * */
+ * WorkerGetLiveGroupCount returns the number of groups with a primary in the cluster.
+ */
 uint32
-WorkerGetLiveNodeCount(void)
+WorkerGetLiveGroupCount(void)
 {
 	List *workerNodeList = ActivePrimaryNodeList();
 	uint32 liveWorkerCount = list_length(workerNodeList);
