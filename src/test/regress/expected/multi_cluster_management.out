@@ -180,6 +180,19 @@ SELECT 1 FROM master_add_node('localhost', :worker_2_port);
 (1 row)
 
 UPDATE pg_dist_placement SET shardstate=1 WHERE groupid=:worker_2_group;
+-- when there is no primary we should get a pretty error
+UPDATE pg_dist_node SET noderole = 'secondary' WHERE nodeport=:worker_2_port;
+SELECT * FROM cluster_management_test;
+ERROR:  group 3 does not have a primary node
+DETAIL:  the primary node may be in the process of failing over
+-- when there is no node at all in the group we should get a different error
+DELETE FROM pg_dist_node WHERE nodeport=:worker_2_port;
+SELECT * FROM cluster_management_test;
+ERROR:  the metadata is inconsistent
+DETAIL:  there is a placement in group 3 but there are no nodes in that group
+-- clean-up
+SELECT groupid as new_group FROM master_add_node('localhost', :worker_2_port) \gset
+UPDATE pg_dist_placement SET groupid = :new_group WHERE groupid = :worker_2_group;
 DROP TABLE cluster_management_test;
 -- check that adding/removing nodes are propagated to nodes with hasmetadata=true
 SELECT master_remove_node('localhost', :worker_2_port);
@@ -251,14 +264,14 @@ SELECT
 	master_add_node('localhost', :worker_2_port);
               master_add_node              |              master_add_node              
 -------------------------------------------+-------------------------------------------
- (6,6,localhost,57637,default,f,t,primary) | (7,7,localhost,57638,default,f,t,primary)
+ (7,7,localhost,57637,default,f,t,primary) | (8,8,localhost,57638,default,f,t,primary)
 (1 row)
 
 SELECT * FROM pg_dist_node ORDER BY nodeid;
  nodeid | groupid | nodename  | nodeport | noderack | hasmetadata | isactive | noderole 
 --------+---------+-----------+----------+----------+-------------+----------+----------
-      6 |       6 | localhost |    57637 | default  | f           | t        | primary
-      7 |       7 | localhost |    57638 | default  | f           | t        | primary
+      7 |       7 | localhost |    57637 | default  | f           | t        | primary
+      8 |       8 | localhost |    57638 | default  | f           | t        | primary
 (2 rows)
 
 -- check that mixed add/remove node commands work fine inside transaction
@@ -408,25 +421,25 @@ SELECT stop_metadata_sync_to_node('localhost', :worker_2_port);
 -- check that you can't add more than one node to a group
 SELECT groupid AS worker_1_group FROM pg_dist_node WHERE nodeport = :worker_1_port \gset
 SELECT master_add_node('localhost', 9999, nodegroup => :worker_1_group, noderole => 'primary');
-ERROR:  group 11 already has a primary node
+ERROR:  group 12 already has a primary node
 -- check that you can add secondaries and unavailable nodes to a group
 SELECT groupid AS worker_2_group FROM pg_dist_node WHERE nodeport = :worker_2_port \gset
 SELECT master_add_node('localhost', 9998, nodegroup => :worker_1_group, noderole => 'secondary');
                master_add_node                
 ----------------------------------------------
- (14,11,localhost,9998,default,f,t,secondary)
+ (15,12,localhost,9998,default,f,t,secondary)
 (1 row)
 
 SELECT master_add_node('localhost', 9997, nodegroup => :worker_1_group, noderole => 'unavailable');
                 master_add_node                 
 ------------------------------------------------
- (15,11,localhost,9997,default,f,t,unavailable)
+ (16,12,localhost,9997,default,f,t,unavailable)
 (1 row)
 
 SELECT master_add_node('localhost', 9996, nodegroup => :worker_2_group, noderole => 'secondary');
                master_add_node                
 ----------------------------------------------
- (16,13,localhost,9996,default,f,t,secondary)
+ (17,14,localhost,9996,default,f,t,secondary)
 (1 row)
 
 -- don't remove the secondary and unavailable nodes, check that no commands are sent to

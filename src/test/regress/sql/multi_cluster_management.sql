@@ -71,6 +71,17 @@ SELECT master_get_active_worker_nodes();
 SELECT 1 FROM master_add_node('localhost', :worker_2_port);
 UPDATE pg_dist_placement SET shardstate=1 WHERE groupid=:worker_2_group;
 
+-- when there is no primary we should get a pretty error
+UPDATE pg_dist_node SET noderole = 'secondary' WHERE nodeport=:worker_2_port;
+SELECT * FROM cluster_management_test;
+
+-- when there is no node at all in the group we should get a different error
+DELETE FROM pg_dist_node WHERE nodeport=:worker_2_port;
+SELECT * FROM cluster_management_test;
+
+-- clean-up
+SELECT groupid as new_group FROM master_add_node('localhost', :worker_2_port) \gset
+UPDATE pg_dist_placement SET groupid = :new_group WHERE groupid = :worker_2_group;
 DROP TABLE cluster_management_test;
 
 -- check that adding/removing nodes are propagated to nodes with hasmetadata=true
