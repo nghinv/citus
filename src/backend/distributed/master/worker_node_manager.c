@@ -54,8 +54,8 @@ static bool ListMember(List *currentList, WorkerNode *workerNode);
  */
 
 /*
- * WorkerGetRandomCandidateNode accepts a list of worker nodes and returns a random
- * worker node which is not in that list.
+ * WorkerGetRandomCandidateNode accepts a list of WorkerNode's and returns a random
+ * primary node which is not in that list.
  *
  * Note that the function returns null if the worker membership list does not
  * contain enough nodes to allocate a new worker node.

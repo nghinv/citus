@@ -82,6 +82,13 @@ SELECT * FROM cluster_management_test;
 -- clean-up
 SELECT groupid as new_group FROM master_add_node('localhost', :worker_2_port) \gset
 UPDATE pg_dist_placement SET groupid = :new_group WHERE groupid = :worker_2_group;
+
+-- test that you are allowed to remove secondary nodes even if there are placements
+SELECT master_add_node('localhost', 9990, nodegroup => :new_group, noderole => 'secondary');
+SELECT master_remove_node('localhost', :worker_2_port);
+SELECT master_remove_node('localhost', 9990);
+
+-- clean-up
 DROP TABLE cluster_management_test;
 
 -- check that adding/removing nodes are propagated to nodes with hasmetadata=true

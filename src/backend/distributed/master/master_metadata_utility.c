@@ -605,12 +605,9 @@ ShardLength(uint64 shardId)
 }
 
 
-/*
- * NodeHasShardPlacements returns whether any active shards are placed on the group
- * this node is a part of.
- */
+/* GroupHasShardPlacements returns whether any active shards are placed on the group */
 bool
-NodeHasShardPlacements(char *nodeName, int32 nodePort, bool onlyConsiderActivePlacements)
+GroupHasShardPlacements(uint32 groupId, bool onlyConsiderActivePlacements)
 {
 	const int scanKeyCount = (onlyConsiderActivePlacements ? 2 : 1);
 	const bool indexOK = false;
@@ -620,8 +617,6 @@ NodeHasShardPlacements(char *nodeName, int32 nodePort, bool onlyConsiderActivePl
 	HeapTuple heapTuple = NULL;
 	SysScanDesc scanDescriptor = NULL;
 	ScanKeyData scanKey[scanKeyCount];
-
-	uint32 groupId = GroupForNode(nodeName, nodePort);
 
 	Relation pgPlacement = heap_open(DistPlacementRelationId(),
 									 AccessShareLock);

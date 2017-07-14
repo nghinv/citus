@@ -196,16 +196,17 @@ master_disable_node(PG_FUNCTION_ARGS)
 	int32 nodePort = PG_GETARG_INT32(1);
 
 	char *nodeName = text_to_cstring(nodeNameText);
-	bool hasActiveShardPlacements = false;
 	bool isActive = false;
+
+	uint32 groupId = 0;
 
 	CheckCitusVersion(ERROR);
 
-	DeleteAllReferenceTablePlacementsFromNode(nodeName, nodePort);
+	groupId = GroupForNode(nodeName, nodePort);
 
-	hasActiveShardPlacements = NodeHasShardPlacements(nodeName, nodePort,
-													  onlyConsiderActivePlacements);
-	if (hasActiveShardPlacements)
+	DeleteAllReferenceTablePlacementsFromGroup(groupId);
+
+	if (GroupHasShardPlacements(groupId, onlyConsiderActivePlacements))
 	{
 		ereport(NOTICE, (errmsg("Node %s:%d has active shard placements. Some queries "
 								"may fail after this operation. Use "
@@ -532,28 +533,35 @@ RemoveNodeFromCluster(char *nodeName, int32 nodePort)
 {
 	const bool onlyConsiderActivePlacements = false;
 	char *nodeDeleteCommand = NULL;
-	bool hasAnyShardPlacements = false;
 	WorkerNode *workerNode = NULL;
 	List *referenceTableList = NIL;
 	uint32 deletedNodeId = INVALID_PLACEMENT_ID;
+	Oid primaryRole = PrimaryNodeRoleId();
 
 	EnsureCoordinator();
 	EnsureSuperUser();
 
 	workerNode = FindWorkerNode(nodeName, nodePort);
+	if (workerNode == NULL)
+	{
+		ereport(ERROR, (errmsg("node at \"%s:%u\" does not exist", nodeName, nodePort)));
+	}
 
 	if (workerNode != NULL)
 	{
 		deletedNodeId = workerNode->nodeId;
 	}
 
-	DeleteAllReferenceTablePlacementsFromNode(nodeName, nodePort);
-
-	hasAnyShardPlacements = NodeHasShardPlacements(nodeName, nodePort,
-												   onlyConsiderActivePlacements);
-	if (hasAnyShardPlacements)
+	if (workerNode->nodeRole == primaryRole)
 	{
-		ereport(ERROR, (errmsg("you cannot remove a node which has shard placements")));
+		DeleteAllReferenceTablePlacementsFromGroup(workerNode->groupId);
+	}
+
+	if (workerNode->nodeRole == primaryRole &&
+		GroupHasShardPlacements(workerNode->groupId, onlyConsiderActivePlacements))
+	{
+		ereport(ERROR, (errmsg("you cannot remove the primary node of a group which "
+							   "has shard placements")));
 	}
 
 	DeleteNodeRow(nodeName, nodePort);
@@ -563,16 +571,20 @@ RemoveNodeFromCluster(char *nodeName, int32 nodePort)
 	 * column for colocation group of reference tables so that replication factor will
 	 * be equal to worker count.
 	 */
-	referenceTableList = ReferenceTableOidList();
-	if (list_length(referenceTableList) != 0)
+	if (workerNode->nodeRole == primaryRole)
 	{
-		Oid firstReferenceTableId = linitial_oid(referenceTableList);
-		uint32 referenceTableColocationId = TableColocationId(firstReferenceTableId);
+		referenceTableList = ReferenceTableOidList();
+		if (list_length(referenceTableList) != 0)
+		{
+			Oid firstReferenceTableId = linitial_oid(referenceTableList);
+			uint32 referenceTableColocationId = TableColocationId(firstReferenceTableId);
 
-		List *workerNodeList = ActivePrimaryNodeList();
-		int workerCount = list_length(workerNodeList);
+			List *workerNodeList = ActivePrimaryNodeList();
+			int workerCount = list_length(workerNodeList);
 
-		UpdateColocationGroupReplicationFactor(referenceTableColocationId, workerCount);
+			UpdateColocationGroupReplicationFactor(referenceTableColocationId,
+												   workerCount);
+		}
 	}
 
 	nodeDeleteCommand = NodeDeleteCommand(deletedNodeId);

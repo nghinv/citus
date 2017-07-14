@@ -382,13 +382,13 @@ CreateReferenceTableColocationId()
 
 
 /*
- * DeleteAllReferenceTablePlacementsFromNode function iterates over list of reference
+ * DeleteAllReferenceTablePlacementsFromGroup function iterates over list of reference
  * tables and deletes all reference table placements from pg_dist_placement table
- * for given worker node. However, it does not modify replication factor of the colocation
+ * for given group. However, it does not modify replication factor of the colocation
  * group of reference tables. It is caller's responsibility to do that if it is necessary.
  */
 void
-DeleteAllReferenceTablePlacementsFromNode(char *workerName, uint32 workerPort)
+DeleteAllReferenceTablePlacementsFromGroup(uint32 groupId)
 {
 	List *referenceTableList = ReferenceTableOidList();
 	ListCell *referenceTableCell = NULL;
@@ -401,16 +401,14 @@ DeleteAllReferenceTablePlacementsFromNode(char *workerName, uint32 workerPort)
 
 	/*
 	 * We sort the reference table list to prevent deadlocks in concurrent
-	 * DeleteAllReferenceTablePlacementsFromNode calls.
+	 * DeleteAllReferenceTablePlacementsFromGroup calls.
 	 */
 	referenceTableList = SortList(referenceTableList, CompareOids);
 	foreach(referenceTableCell, referenceTableList)
 	{
-		uint32 workerGroup = GroupForNode(workerName, workerPort);
-
 		Oid referenceTableId = lfirst_oid(referenceTableCell);
 		List *placements = GroupShardPlacementsForTableOnGroup(referenceTableId,
-															   workerGroup);
+															   groupId);
 		GroupShardPlacement *placement = (GroupShardPlacement *) linitial(placements);
 
 		uint64 shardId = placement->shardId;
