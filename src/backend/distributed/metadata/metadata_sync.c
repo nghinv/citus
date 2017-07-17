@@ -398,11 +398,20 @@ NodeListInsertCommand(List *workerNodeList)
 	StringInfo nodeListInsertCommand = makeStringInfo();
 	int workerCount = list_length(workerNodeList);
 	int processedWorkerNodeCount = 0;
+	Oid primaryRole = PrimaryNodeRoleId();
 
 	/* if there are no workers, return NULL */
 	if (workerCount == 0)
 	{
 		return nodeListInsertCommand->data;
+	}
+
+	if (primaryRole == InvalidOid)
+	{
+		ereport(ERROR, (errmsg("bad metadata, noderole does not exist"),
+						errdetail("you should never see this, please submit "
+								  "a bug report"),
+						errhint("run ALTER EXTENSION citus UPDATE and try again")));
 	}
 
 	/* generate the query without any values yet */
@@ -417,24 +426,9 @@ NodeListInsertCommand(List *workerNodeList)
 		char *hasMetadataString = workerNode->hasMetadata ? "TRUE" : "FALSE";
 		char *isActiveString = workerNode->isActive ? "TRUE" : "FALSE";
 
-		char *nodeRoleString = NULL;
-
-		if (workerNode->nodeRole != InvalidOid)
-		{
-			Datum nodeRoleOidDatum = ObjectIdGetDatum(workerNode->nodeRole);
-			Datum nodeRoleStringDatum = DirectFunctionCall1(enum_out, nodeRoleOidDatum);
-			nodeRoleString = DatumGetCString(nodeRoleStringDatum);
-		}
-		else
-		{
-			/*
-			 * Hack because master_initialize_node_metadata calls this before nodeRole
-			 * has been created. The user will never have the opportunity to see this
-			 * error out, when master_initialize_node_metadata runs there are no other
-			 * nodes with metadata to run nodeListInsertCommand on.
-			 */
-			nodeRoleString = "does-not-exist-will-throw-error";
-		}
+		Datum nodeRoleOidDatum = ObjectIdGetDatum(workerNode->nodeRole);
+		Datum nodeRoleStringDatum = DirectFunctionCall1(enum_out, nodeRoleOidDatum);
+		char *nodeRoleString = DatumGetCString(nodeRoleStringDatum);
 
 		appendStringInfo(nodeListInsertCommand,
 						 "(%d, %d, %s, %d, %s, %s, %s, '%s'::noderole)",

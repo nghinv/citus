@@ -55,6 +55,7 @@ static void RemoveNodeFromCluster(char *nodeName, int32 nodePort);
 static Datum AddNodeMetadata(char *nodeName, int32 nodePort, int32 groupId,
 							 char *nodeRack, bool hasMetadata, bool isActive,
 							 Oid nodeRole, bool *nodeAlreadyExists);
+static uint32 CountPrimariesWithMetadata();
 static void SetNodeState(char *nodeName, int32 nodePort, bool isActive);
 static HeapTuple GetNodeTuple(char *nodeName, int32 nodePort);
 static Datum GenerateNodeTuple(WorkerNode *workerNode);
@@ -596,6 +597,34 @@ RemoveNodeFromCluster(char *nodeName, int32 nodePort)
 }
 
 
+/* CountPrimariesWithMetadata returns the number of primary nodes which have metadata. */
+static uint32
+CountPrimariesWithMetadata()
+{
+	uint32 primariesWithMetadata = 0;
+	WorkerNode *workerNode = NULL;
+	Oid primaryRole = PrimaryNodeRoleId();
+
+	HASH_SEQ_STATUS status;
+	HTAB *workerNodeHash = GetWorkerNodeHash();
+
+	hash_seq_init(&status, workerNodeHash);
+
+	while ((workerNode = hash_seq_search(&status)) != NULL)
+	{
+		/* if noderole does not exist yet then all nodes are primary nodes */
+		bool isPrimary =
+			(primaryRole == InvalidOid || workerNode->nodeRole == primaryRole);
+		if (isPrimary && workerNode->hasMetadata)
+		{
+			primariesWithMetadata++;
+		}
+	}
+
+	return primariesWithMetadata;
+}
+
+
 /*
  * AddNodeMetadata checks the given node information and adds the specified node to the
  * pg_dist_node table of the master and workers with metadata.
@@ -614,9 +643,8 @@ AddNodeMetadata(char *nodeName, int32 nodePort, int32 groupId, char *nodeRack,
 	Datum returnData = 0;
 	WorkerNode *workerNode = NULL;
 	char *nodeDeleteCommand = NULL;
-	char *nodeInsertCommand = NULL;
-	List *workerNodeList = NIL;
 	Oid primaryRole;
+	uint32 primariesWithMetadata;
 
 	EnsureCoordinator();
 	EnsureSuperUser();
@@ -679,14 +707,18 @@ AddNodeMetadata(char *nodeName, int32 nodePort, int32 groupId, char *nodeRack,
 
 	workerNode = FindWorkerNode(nodeName, nodePort);
 
-	/* send the delete command all nodes with metadata */
+	/* send the delete command to all primary nodes with metadata */
 	nodeDeleteCommand = NodeDeleteCommand(workerNode->nodeId);
 	SendCommandToWorkers(WORKERS_WITH_METADATA, nodeDeleteCommand);
 
 	/* finally prepare the insert command and send it to all primary nodes */
-	workerNodeList = list_make1(workerNode);
-	nodeInsertCommand = NodeListInsertCommand(workerNodeList);
-	SendCommandToWorkers(WORKERS_WITH_METADATA, nodeInsertCommand);
+	primariesWithMetadata = CountPrimariesWithMetadata();
+	if (primariesWithMetadata != 0)
+	{
+		List *workerNodeList = list_make1(workerNode);
+		char *nodeInsertCommand = NodeListInsertCommand(workerNodeList);
+		SendCommandToWorkers(WORKERS_WITH_METADATA, nodeInsertCommand);
+	}
 
 	heap_close(pgDistNode, NoLock);
 
