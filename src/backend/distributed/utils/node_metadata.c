@@ -207,7 +207,7 @@ master_disable_node(PG_FUNCTION_ARGS)
 
 	DeleteAllReferenceTablePlacementsFromNodeGroup(groupId);
 
-	if (GroupHasShardPlacements(groupId, onlyConsiderActivePlacements))
+	if (NodeGroupHasShardPlacements(groupId, onlyConsiderActivePlacements))
 	{
 		ereport(NOTICE, (errmsg("Node %s:%d has active shard placements. Some queries "
 								"may fail after this operation. Use "
@@ -559,7 +559,7 @@ RemoveNodeFromCluster(char *nodeName, int32 nodePort)
 	}
 
 	if (workerNode->nodeRole == primaryRole &&
-		GroupHasShardPlacements(workerNode->groupId, onlyConsiderActivePlacements))
+		NodeGroupHasShardPlacements(workerNode->groupId, onlyConsiderActivePlacements))
 	{
 		ereport(ERROR, (errmsg("you cannot remove the primary node of a group which "
 							   "has shard placements")));

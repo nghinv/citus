@@ -605,9 +605,11 @@ ShardLength(uint64 shardId)
 }
 
 
-/* GroupHasShardPlacements returns whether any active shards are placed on the group */
+/*
+ * NodeGroupHasShardPlacements returns whether any active shards are placed on the group
+ */
 bool
-GroupHasShardPlacements(uint32 groupId, bool onlyConsiderActivePlacements)
+NodeGroupHasShardPlacements(uint32 groupId, bool onlyConsiderActivePlacements)
 {
 	const int scanKeyCount = (onlyConsiderActivePlacements ? 2 : 1);
 	const bool indexOK = false;
