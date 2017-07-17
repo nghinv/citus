@@ -19,6 +19,13 @@ ALTER TABLE pg_dist_node ADD COLUMN noderole noderole NOT NULL DEFAULT 'primary'
 -- we're now allowed to have more than one node per group
 ALTER TABLE pg_catalog.pg_dist_node DROP CONSTRAINT pg_dist_node_groupid_unique;
 
+-- so make sure pg_dist_shard_placement only returns writable placements
+CREATE OR REPLACE VIEW pg_catalog.pg_dist_shard_placement AS
+SELECT shardid, shardstate, shardlength, nodename, nodeport, placementid
+FROM pg_dist_placement placement INNER JOIN pg_dist_node node ON (
+  placement.groupid = node.groupid AND node.noderole = 'primary'
+);
+
 CREATE OR REPLACE FUNCTION citus.pg_dist_node_trigger_func()
 RETURNS TRIGGER AS $$
   BEGIN
