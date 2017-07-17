@@ -382,13 +382,13 @@ CreateReferenceTableColocationId()
 
 
 /*
- * DeleteAllReferenceTablePlacementsFromGroup function iterates over list of reference
+ * DeleteAllReferenceTablePlacementsFromNodeGroup function iterates over list of reference
  * tables and deletes all reference table placements from pg_dist_placement table
  * for given group. However, it does not modify replication factor of the colocation
  * group of reference tables. It is caller's responsibility to do that if it is necessary.
  */
 void
-DeleteAllReferenceTablePlacementsFromGroup(uint32 groupId)
+DeleteAllReferenceTablePlacementsFromNodeGroup(uint32 groupId)
 {
 	List *referenceTableList = ReferenceTableOidList();
 	ListCell *referenceTableCell = NULL;
@@ -401,7 +401,7 @@ DeleteAllReferenceTablePlacementsFromGroup(uint32 groupId)
 
 	/*
 	 * We sort the reference table list to prevent deadlocks in concurrent
-	 * DeleteAllReferenceTablePlacementsFromGroup calls.
+	 * DeleteAllReferenceTablePlacementsFromNodeGroup calls.
 	 */
 	referenceTableList = SortList(referenceTableList, CompareOids);
 	foreach(referenceTableCell, referenceTableList)

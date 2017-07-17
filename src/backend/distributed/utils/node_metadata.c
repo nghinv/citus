@@ -205,7 +205,7 @@ master_disable_node(PG_FUNCTION_ARGS)
 
 	groupId = GroupForNode(nodeName, nodePort);
 
-	DeleteAllReferenceTablePlacementsFromGroup(groupId);
+	DeleteAllReferenceTablePlacementsFromNodeGroup(groupId);
 
 	if (GroupHasShardPlacements(groupId, onlyConsiderActivePlacements))
 	{
@@ -555,7 +555,7 @@ RemoveNodeFromCluster(char *nodeName, int32 nodePort)
 
 	if (workerNode->nodeRole == primaryRole)
 	{
-		DeleteAllReferenceTablePlacementsFromGroup(workerNode->groupId);
+		DeleteAllReferenceTablePlacementsFromNodeGroup(workerNode->groupId);
 	}
 
 	if (workerNode->nodeRole == primaryRole &&
