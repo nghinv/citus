@@ -40,7 +40,9 @@
 #include "distributed/worker_manager.h"
 #include "distributed/worker_protocol.h"
 #include "executor/executor.h"
+#include "nodes/makefuncs.h"
 #include "parser/parse_func.h"
+#include "parser/parse_type.h"
 #include "utils/builtins.h"
 #include "utils/catcache.h"
 #include "utils/datum.h"
@@ -1835,9 +1837,34 @@ CurrentUserName(void)
 
 /* returns InvalidOid if the noderole enum doesn't exist yet */
 static Oid
+LookupNodeRoleTypeOid()
+{
+	Value *schemaName = makeString("pg_catalog");
+	Value *typeName = makeString("noderole");
+	List *qualifiedName = list_make2(schemaName, typeName);
+	TypeName *enumTypeName = makeTypeNameFromNameList(qualifiedName);
+
+	Oid nodeRoleTypId;
+
+	/* typenameTypeId but instead of raising an error return InvalidOid */
+	Type tup = LookupTypeName(NULL, enumTypeName, NULL, false);
+	if (tup == NULL)
+	{
+		return InvalidOid;
+	}
+
+	nodeRoleTypId = HeapTupleGetOid(tup);
+	ReleaseSysCache(tup);
+
+	return nodeRoleTypId;
+}
+
+
+/* returns InvalidOid if the noderole enum doesn't exist yet */
+static Oid
 LookupNodeRoleValueId(char *valueName)
 {
-	Oid nodeRoleTypId = TypenameGetTypid("noderole");
+	Oid nodeRoleTypId = LookupNodeRoleTypeOid();
 
 	if (nodeRoleTypId == InvalidOid)
 	{

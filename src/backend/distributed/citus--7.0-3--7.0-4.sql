@@ -2,7 +2,7 @@
 
 SET search_path = 'pg_catalog';
 
-CREATE TYPE noderole AS ENUM (
+CREATE TYPE pg_catalog.noderole AS ENUM (
 	'primary',     -- node is available and accepting writes
 	'secondary',   -- node is available but only accepts reads
 	'unavailable' -- node is in recovery or otherwise not usable
