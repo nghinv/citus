@@ -643,8 +643,7 @@ AddNodeMetadata(char *nodeName, int32 nodePort, int32 groupId, char *nodeRack,
 	Datum returnData = 0;
 	WorkerNode *workerNode = NULL;
 	char *nodeDeleteCommand = NULL;
-	Oid primaryRole;
-	uint32 primariesWithMetadata;
+	uint32 primariesWithMetadata = 0;
 
 	EnsureCoordinator();
 	EnsureSuperUser();
@@ -687,8 +686,7 @@ AddNodeMetadata(char *nodeName, int32 nodePort, int32 groupId, char *nodeRack,
 	/* if nodeRole hasn't been added yet there's a constraint for one-node-per-group */
 	if (nodeRole != InvalidOid)
 	{
-		primaryRole = PrimaryNodeRoleId();
-		if (nodeRole == primaryRole)
+		if (nodeRole == PrimaryNodeRoleId())
 		{
 			WorkerNode *existingPrimaryNode = PrimaryNodeForGroup(groupId, NULL);
 
@@ -989,19 +987,7 @@ InsertNodeRow(int nodeid, char *nodeName, int32 nodePort, uint32 groupId, char *
 	values[Anum_pg_dist_node_noderack - 1] = CStringGetTextDatum(nodeRack);
 	values[Anum_pg_dist_node_hasmetadata - 1] = BoolGetDatum(hasMetadata);
 	values[Anum_pg_dist_node_isactive - 1] = BoolGetDatum(isActive);
-
-	if (nodeRole == InvalidOid)
-	{
-		/*
-		 * TODO: Make sure this will either error out or use the default once the
-		 * column exists
-		 */
-		isNulls[Anum_pg_dist_node_noderole - 1] = true;
-	}
-	else
-	{
-		values[Anum_pg_dist_node_noderole - 1] = ObjectIdGetDatum(nodeRole);
-	}
+	values[Anum_pg_dist_node_noderole - 1] = ObjectIdGetDatum(nodeRole);
 
 	/* open shard relation and insert new tuple */
 	pgDistNode = heap_open(DistNodeRelationId(), AccessExclusiveLock);

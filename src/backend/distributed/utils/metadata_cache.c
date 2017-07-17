@@ -409,7 +409,7 @@ ResolveGroupShardPlacement(GroupShardPlacement *groupShardPlacement,
 	DistTableCacheEntry *tableEntry = shardEntry->tableEntry;
 	int shardIndex = shardEntry->shardIndex;
 	ShardInterval *shardInterval = tableEntry->sortedShardIntervalArray[shardIndex];
-	bool groupContainsNodes;
+	bool groupContainsNodes = false;
 
 	ShardPlacement *shardPlacement = CitusMakeNode(ShardPlacement);
 	uint32 groupId = groupShardPlacement->groupId;
@@ -1835,7 +1835,10 @@ CurrentUserName(void)
 }
 
 
-/* returns InvalidOid if the noderole enum doesn't exist yet */
+/*
+ * LookupNodeRoleValueId returns the Oid of the "pg_catalog.noderole" type, or InvalidOid
+ * if it does not exist.
+ */
 static Oid
 LookupNodeRoleTypeOid()
 {
@@ -1860,7 +1863,10 @@ LookupNodeRoleTypeOid()
 }
 
 
-/* returns InvalidOid if the noderole enum doesn't exist yet */
+/*
+ * LookupNodeRoleValueId returns the Oid of the value in "pg_catalog.noderole" which
+ * matches the provided name, or InvalidOid if the noderole enum doesn't exist yet.
+ */
 static Oid
 LookupNodeRoleValueId(char *valueName)
 {
