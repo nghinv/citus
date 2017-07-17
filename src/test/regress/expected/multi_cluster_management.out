@@ -458,5 +458,14 @@ SELECT master_add_node('localhost', 9996, nodegroup => :worker_2_group, noderole
  (18,14,localhost,9996,default,f,t,secondary)
 (1 row)
 
+-- check that you can't manually add two primaries to a group
+INSERT INTO pg_dist_node (nodename, nodeport, groupid, noderole)
+  VALUES ('localhost', 5000, :worker_1_group, 'primary');
+ERROR:  there cannot be two primary nodes in a group
+CONTEXT:  PL/pgSQL function citus.pg_dist_node_trigger_func() line 8 at RAISE
+UPDATE pg_dist_node SET noderole = 'primary'
+  WHERE groupid = :worker_1_group AND nodeport = 9998;
+ERROR:  there cannot be two primary nodes in a group
+CONTEXT:  PL/pgSQL function citus.pg_dist_node_trigger_func() line 16 at RAISE
 -- don't remove the secondary and unavailable nodes, check that no commands are sent to
 -- them in any of the remaining tests
