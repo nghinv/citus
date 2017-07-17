@@ -58,7 +58,7 @@ extern WorkerNode * WorkerGetRoundRobinCandidateNode(List *workerNodeList,
 													 uint64 shardId,
 													 uint32 placementIndex);
 extern WorkerNode * WorkerGetLocalFirstCandidateNode(List *currentNodeList);
-extern uint32 WorkerGetLiveGroupCount(void);
+extern uint32 ActivePrimaryNodeCount(void);
 extern List * ActivePrimaryNodeList(void);
 extern WorkerNode * FindWorkerNode(char *nodeName, int32 nodePort);
 extern List * ReadWorkerNodes(void);

@@ -296,10 +296,10 @@ WorkerGetNodeWithName(const char *hostname)
 
 
 /*
- * WorkerGetLiveGroupCount returns the number of groups with a primary in the cluster.
+ * ActivePrimaryNodeCount returns the number of groups with a primary in the cluster.
  */
 uint32
-WorkerGetLiveGroupCount(void)
+ActivePrimaryNodeCount(void)
 {
 	List *workerNodeList = ActivePrimaryNodeList();
 	uint32 liveWorkerCount = list_length(workerNodeList);
